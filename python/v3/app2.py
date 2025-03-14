@@ -4,6 +4,9 @@ import json
 import os
 import base64
 import requests
+import subprocess
+import tempfile
+import shutil
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -24,11 +27,25 @@ class VisualizerApp:
         # GitHub configuration
         self.github_token = os.environ.get('GITHUB_TOKEN')
         self.github_owner = os.environ.get('GITHUB_OWNER', 'DongjuneChang')
-        self.github_repo = os.environ.get('GITHUB_REPO', 'AR')
+        self.github_repo = os.environ.get('GITHUB_REPO', 'AR_info_data')
         self.overrides_path = os.environ.get(
             'OVERRIDES_PATH', 
-            'AR_info_data/visualization/visualization_overrides.json'
+            'visualization/visualization_overrides.json'
         )
+        
+        # Deploy Key configuration
+        self.use_deploy_key = os.environ.get('USE_DEPLOY_KEY', 'false').lower() == 'true'
+        self.deploy_key_path = os.environ.get('DEPLOY_KEY_PATH')
+        
+        # Temporary directory for git operations
+        self.temp_dir = None
+        if self.use_deploy_key:
+            if not self.deploy_key_path:
+                print("WARNING: USE_DEPLOY_KEY is true but DEPLOY_KEY_PATH is not set")
+            else:
+                # Create temporary directory for git operations
+                self.temp_dir = tempfile.mkdtemp()
+                self._setup_git_repo()
         
         # Initialize Flask app
         self.app = Flask(__name__, 
@@ -51,24 +68,155 @@ class VisualizerApp:
             
             return config
 
+    def __del__(self):
+        """Clean up temporary directory"""
+        if self.temp_dir and os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
+    
+    def _setup_git_repo(self):
+        """Setup git repository with deploy key"""
+        try:
+            # Clone repository
+            repo_url = f"git@github.com:{self.github_owner}/{self.github_repo}.git"
+            ssh_command = f"ssh -i {self.deploy_key_path} -o StrictHostKeyChecking=no"
+            
+            # Set GIT_SSH_COMMAND environment variable
+            os.environ["GIT_SSH_COMMAND"] = ssh_command
+            
+            # Clone repository
+            subprocess.run(
+                ["git", "clone", repo_url, self.temp_dir],
+                check=True,
+                capture_output=True
+            )
+            
+            print(f"Successfully cloned repository to {self.temp_dir}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error setting up git repository: {e.stderr.decode()}")
+            if self.temp_dir and os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir)
+            self.temp_dir = None
+    
     def _github_request(self, method, data=None):
         """Handle GitHub API requests"""
-        if not self.github_token:
-            raise ValueError("GitHub token not found in environment variables")
-            
+        # If using deploy key, use git commands instead of GitHub API
+        if self.use_deploy_key and self.temp_dir and method.upper() == 'GET':
+            return self._git_get_file()
+        elif self.use_deploy_key and self.temp_dir and method.upper() == 'PUT':
+            return self._git_put_file(data)
+        
+        # Otherwise use GitHub API
         headers = {
-            "Authorization": f"token {self.github_token}",
             "Accept": "application/vnd.github.v3+json"
         }
+        
+        # Add authorization header if token is available
+        if self.github_token:
+            headers["Authorization"] = f"token {self.github_token}"
         
         url = f"https://api.github.com/repos/{self.github_owner}/{self.github_repo}/contents/{self.overrides_path}"
         
         if method.upper() == 'GET':
+            # For public repos, GET requests don't require a token
             return requests.get(url, headers=headers)
         elif method.upper() == 'PUT':
+            if not self.github_token:
+                raise ValueError("GitHub token required for PUT requests")
             return requests.put(url, headers=headers, json=data)
         else:
             raise ValueError(f"Unsupported method: {method}")
+    
+    def _git_get_file(self):
+        """Get file using git commands"""
+        try:
+            # Pull latest changes
+            subprocess.run(
+                ["git", "pull", "origin", "master"],
+                cwd=self.temp_dir,
+                check=True,
+                capture_output=True
+            )
+            
+            # Read file
+            file_path = os.path.join(self.temp_dir, self.overrides_path)
+            with open(file_path, 'r') as f:
+                content = f.read()
+            
+            # Create response-like object
+            class GitResponse:
+                def __init__(self, content):
+                    self.status_code = 200
+                    self._content = content
+                
+                def json(self):
+                    return {
+                        'content': base64.b64encode(self._content.encode()).decode(),
+                        'sha': 'git'  # Use 'git' as sha for git operations
+                    }
+            
+            return GitResponse(content)
+        except Exception as e:
+            # Create error response-like object
+            class GitErrorResponse:
+                def __init__(self, error):
+                    self.status_code = 500
+                    self.text = str(error)
+            
+            return GitErrorResponse(e)
+    
+    def _git_put_file(self, data):
+        """Update file using git commands"""
+        try:
+            # Write content to file
+            file_path = os.path.join(self.temp_dir, self.overrides_path)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            with open(file_path, 'w') as f:
+                f.write(base64.b64decode(data['content']).decode())
+            
+            # Commit and push changes
+            subprocess.run(
+                ["git", "add", self.overrides_path],
+                cwd=self.temp_dir,
+                check=True,
+                capture_output=True
+            )
+            
+            subprocess.run(
+                ["git", "commit", "-m", data.get('message', 'Update visualization overrides')],
+                cwd=self.temp_dir,
+                check=True,
+                capture_output=True
+            )
+            
+            subprocess.run(
+                ["git", "push", "origin", "master"],
+                cwd=self.temp_dir,
+                check=True,
+                capture_output=True
+            )
+            
+            # Create response-like object
+            class GitResponse:
+                def __init__(self):
+                    self.status_code = 200
+                
+                def json(self):
+                    return {
+                        'content': {
+                            'sha': 'git'  # Use 'git' as sha for git operations
+                        }
+                    }
+            
+            return GitResponse()
+        except subprocess.CalledProcessError as e:
+            # Create error response-like object
+            class GitErrorResponse:
+                def __init__(self, error):
+                    self.status_code = 500
+                    self.text = error.stderr.decode()
+            
+            return GitErrorResponse(e)
 
     def _register_routes(self):
         """Register routes"""
@@ -88,13 +236,13 @@ class VisualizerApp:
         return render_template('overrides.html')
 
     def get_overrides(self):
-        """Get visualization overrides from GitHub"""
+        """Get visualization overrides from GitHub or git repository"""
         try:
             response = self._github_request('GET')
             
             if response.status_code != 200:
                 return jsonify({
-                    'error': 'Failed to fetch overrides from GitHub',
+                    'error': 'Failed to fetch overrides',
                     'details': response.text
                 }), response.status_code
             
