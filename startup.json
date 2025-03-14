@@ -1,0 +1,75 @@
+{
+  "top_level_master_id": "DESKTOP-VR8TPOR",
+  "ros_info": {
+    "robot_base_coord_path": "ros_info/coord_tf_robot_base.json",
+    "calibration_data_path": "ros_info/calibration_data.json",
+    "config_yaml_path": "ros_info/params.yaml",
+    "task_information_path": "ros_info/target_reaching_task2.0.csv"
+  },
+  "visualization_lists": {
+    "two_bar_step_visualization_config_path": "visualization/two_bar_step_visualization_config.json",
+    "visualization_overrides_path": "visualization/visualization_overrides.json",
+    "step_trigger_config_path" : "visualization/step_trigger_config.json"
+  },
+  "devices": [
+    {
+      "id": "HOLOLENS-JHOP8T",
+      "ip_address": "10.10.101.32",
+      "ZeroMQ": "192.168.10.142",
+      "device_data_path": "devices/HOLOLENS-JHOP8T.json"
+    },
+    {
+      "id": "HOLOLENS-JH0E3A",
+      "ip_address": "10.10.101.32",
+      "ZeroMQ": "192.168.10.142",
+      "device_data_path": "devices/HOLOLENS-JHOP8T.json"
+    },
+    {
+      "id": "HOLOLENS-MS1JNG",
+      "ip_address": "10.10.100.91",
+      "ZeroMQ": "192.168.10.142",
+      "device_data_path": "devices/HOLOLENS-MS1JNG.json"
+    },
+    {
+      "id": "DESKTOP-VR8TPOR",
+      "ip_address": "192.168.0.51",
+      "ZeroMQ": "192.168.10.142",
+      "device_data_path": "devices/DESKTOP-VR8TPOR.json"
+    },
+    {
+      "id": "HOLOLENS-EP9MKK",
+      "ip_address": "192.168.0.51",
+      "ZeroMQ": "192.168.10.145",
+      "device_data_path": "devices/HOLOLENS-EP9MKK.json"
+    },
+    {
+      "id": "MSI",
+      "ip_address": "100.110.129.223",
+      "ZeroMQ": "100.110.129.223",
+      "device_data_path": "devices/MSI.json"
+    }
+  ],
+  "device_groups": [
+    {
+      "group_index": 0,
+      "context_id": 0, 
+      "device_names": ["HOLOLENS-JHOP8T", "MSI"],
+      "ros_master_ip": "100.110.129.241",
+      "robot_base_coord": "TF_RobotBase"
+    },
+    {
+      "group_index": 1,
+      "context_id": 1,  
+      "device_names": ["HOLOLENS-JH0E3A", "HOLOLENS-EP9MKK"],
+      "ros_master_ip": "100.110.129.241",
+      "robot_base_coord": "TF_RobotBase"
+    },
+    {
+      "group_index": 2,
+      "context_id": 0,  
+      "device_names": ["HOLOLENS-MS1JNG", "DESKTOP-VR8TPOR"],
+      "ros_master_ip": "192.168.10.142",
+      "robot_base_coord": "TF_RobotBase"
+    }
+  ]
+}

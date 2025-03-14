@@ -1,0 +1,30 @@
+workspace:
+  x_max: 0.1
+  x_min: -0.1
+  y_max: 0.1
+  y_min: -0.1
+  z_max: 0.1
+  z_min: -0.1
+
+  ft2base: [[-1, 0, 0], [0, 0, 1], [0, 1, 0]]
+
+  base2ft: [[-1, 0, 0], [0, 0, 1], [0, 1, 0]]
+
+
+robot:
+  joint_bounds: [[-170, 170],
+                 [-120, 120],
+                 [-170, 170],
+                 [-120, 120],
+                 [-170, 170],
+                 [-120, 120],
+                 [-175, 175]]
+
+  joint_vel_max: 6
+
+
+filters:
+  cutoffs:
+    force: 10.0
+    position: 20.0
+    velocity: 200.0

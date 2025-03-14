@@ -1,0 +1,96 @@
+{
+  "bar_style": {
+    "barDimensions": {
+      "barHeight": 0.407,
+      "barScale": 0.95,
+      "barThickness": 0.02,
+      "barWidth": 0.1
+    },
+    "colors": {
+      "backgroundColor": {
+        "a": 0.5098039215686274,
+        "b": 0.5098039215686274,
+        "g": 0.5098039215686274,
+        "r": 0.5058823529411764
+      },
+      "foregroundColor": {
+        "a": 0.5098039215686274,
+        "b": 0.5098039215686274,
+        "g": 0.5098039215686274,
+        "r": 0.5058823529411764
+      }
+    },
+    "label": {
+      "fontSize": 0.04,
+      "labelColor": {
+        "a": 1,
+        "b": 0,
+        "g": 0,
+        "r": 0
+      },
+      "showLabel": true
+    }
+  },
+  "display_info": {
+    "physical_size": {
+      "height": 0.286,
+      "unit": "meters",
+      "width": 0.508
+    },
+    "pixel_to_meter_ratio": {
+      "horizontal": 0.000264583,
+      "vertical": 0.000264815
+    },
+    "raw_pixels": {
+      "barHeight": 1536,
+      "barSpacing": 192,
+      "barWidth": 378,
+      "framePadding": 108,
+      "frameWidth": 378
+    },
+    "resolution": {
+      "height": 1080,
+      "unit": "pixels",
+      "width": 1920
+    }
+  },
+  "visualizer_settings": {
+    "barSettings": {
+      "barSpacing": 0.051,
+      "containerOffset": -0.001
+    },
+    "containerSettings": {
+      "framePadding": 0.029,
+      "frameWidth": 0.2857,
+      "useWhiteFrame": true
+    },
+    "solverSettings": {
+      "orientToCamera": true,
+      "solverOffset": {
+        "x": 0,
+        "y": -0.3,
+        "z": 1.6
+      },
+      "solverType": "RadialView",
+      "useSolver": true
+    },
+    "referenceLineSettings": {
+      "useReferenceLine": true,
+      "referenceLineThickness": 0.005,
+      "referenceLineValue": 50
+    },
+    "referenceAreaSettings": {
+      "useReferenceArea": true,
+      "referenceAreaMin": 45,
+      "referenceAreaMax": 55,
+      "referenceAreaZOffset": 0.005
+    }
+  },
+  "zeromq_settings": {
+    "connectionSettings": {
+      "port": 5555,
+      "serverIp": "192.168.10.142"
+    },
+    "subscriptionFilter": ""
+  }
+}

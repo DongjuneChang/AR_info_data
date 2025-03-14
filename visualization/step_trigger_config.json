@@ -1,0 +1,9 @@
+{
+  "step_trigger_config": {
+    "enabled": true,
+    "negativeStepCountThreshold": 50,
+    "teleportDistance": 3.0,
+    "returnOnPositive": true,
+    "debugMode": false
+  }
+}
