@@ -1,0 +1,450 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Visualization Configuration",
+  "description": "Configuration for the visualization system",
+  "required": ["display_info", "bar_style", "visualizer_settings", "zeromq_settings"],
+  "properties": {
+    "display_info": {
+      "type": "object",
+      "title": "Display Information",
+      "description": "HoloLens display specifications and raw pixel values",
+      "required": ["resolution", "physical_size", "pixel_to_meter_ratio", "raw_pixels"],
+      "properties": {
+        "resolution": {
+          "type": "object",
+          "required": ["width", "height", "unit"],
+          "properties": {
+            "width": {
+              "type": "number",
+              "description": "Display width in pixels",
+              "default": 1920
+            },
+            "height": {
+              "type": "number",
+              "description": "Display height in pixels",
+              "default": 1080
+            },
+            "unit": {
+              "type": "string",
+              "enum": ["pixels"],
+              "default": "pixels"
+            }
+          }
+        },
+        "physical_size": {
+          "type": "object",
+          "required": ["width", "height", "unit"],
+          "properties": {
+            "width": {
+              "type": "number",
+              "description": "Physical display width",
+              "default": 0.508
+            },
+            "height": {
+              "type": "number",
+              "description": "Physical display height",
+              "default": 0.286
+            },
+            "unit": {
+              "type": "string",
+              "enum": ["meters"],
+              "default": "meters"
+            }
+          }
+        },
+        "pixel_to_meter_ratio": {
+          "type": "object",
+          "required": ["horizontal", "vertical"],
+          "properties": {
+            "horizontal": {
+              "type": "number",
+              "description": "Horizontal pixels to meters ratio",
+              "default": 0.000264583
+            },
+            "vertical": {
+              "type": "number",
+              "description": "Vertical pixels to meters ratio",
+              "default": 0.000264815
+            }
+          }
+        },
+        "raw_pixels": {
+          "type": "object",
+          "required": ["barWidth", "barHeight", "barSpacing", "frameWidth", "framePadding"],
+          "properties": {
+            "barWidth": {
+              "type": "number",
+              "description": "Bar width in pixels",
+              "default": 378
+            },
+            "barHeight": {
+              "type": "number",
+              "description": "Bar height in pixels",
+              "default": 1536
+            },
+            "barSpacing": {
+              "type": "number",
+              "description": "Space between bars in pixels",
+              "default": 192
+            },
+            "frameWidth": {
+              "type": "number",
+              "description": "Frame width in pixels",
+              "default": 378
+            },
+            "framePadding": {
+              "type": "number",
+              "description": "Frame padding in pixels",
+              "default": 108
+            }
+          }
+        }
+      }
+    },
+    "bar_style": {
+      "type": "object",
+      "title": "Bar Style",
+      "description": "Style settings for the visualization bars",
+      "required": ["barDimensions", "colors", "label"],
+      "properties": {
+        "barDimensions": {
+          "type": "object",
+          "title": "Bar Dimensions",
+          "description": "Physical dimensions of the bars",
+          "required": ["barWidth", "barHeight", "barThickness", "barScale"],
+          "properties": {
+            "barWidth": {
+              "type": "number",
+              "title": "Bar Width",
+              "description": "Width of the bar",
+              "minimum": 0.01,
+              "maximum": 1,
+              "default": 0.1
+            },
+            "barHeight": {
+              "type": "number",
+              "title": "Bar Height",
+              "description": "Height of the bar",
+              "minimum": 0.01,
+              "maximum": 2,
+              "default": 0.407
+            },
+            "barThickness": {
+              "type": "number",
+              "title": "Bar Thickness",
+              "description": "Thickness of the bar",
+              "minimum": 0.01,
+              "maximum": 0.1,
+              "default": 0.02
+            },
+            "barScale": {
+              "type": "number",
+              "title": "Bar Scale",
+              "description": "Overall scale of the bar",
+              "minimum": 0.1,
+              "maximum": 2,
+              "default": 0.95
+            }
+          }
+        },
+        "colors": {
+          "type": "object",
+          "title": "Colors",
+          "description": "Color settings for the bar container background and bar itself",
+          "required": ["backgroundColor", "foregroundColor"],
+          "properties": {
+            "backgroundColor": {
+              "type": "object",
+              "title": "Bar Background Color",
+              "description": "RGBA color for the bar's background area (a: transparency, 0=transparent, 1=opaque)",
+              "required": ["r", "g", "b", "a"],
+              "properties": {
+                "r": {
+                  "type": "number",
+                  "description": "Red component (0-1)",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 1,
+                  "x-key-parameter": true
+                },
+                "g": {
+                  "type": "number",
+                  "description": "Green component (0-1)",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 1,
+                  "x-key-parameter": true
+                },
+                "b": {
+                  "type": "number",
+                  "description": "Blue component (0-1)",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 1,
+                  "x-key-parameter": true
+                },
+                "a": {
+                  "type": "number",
+                  "description": "Alpha/Transparency (0=transparent, 1=opaque)",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0.5,
+                  "x-key-parameter": true,
+                  "x-display-name": "Transparency"
+                }
+              }
+            },
+            "foregroundColor": {
+              "type": "object",
+              "title": "Bar Color",
+              "description": "RGBA color for the bar itself (a: transparency, 0=transparent, 1=opaque)",
+              "required": ["r", "g", "b", "a"],
+              "properties": {
+                "r": {
+                  "type": "number",
+                  "description": "Red component (0-1)",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0
+                },
+                "g": {
+                  "type": "number",
+                  "description": "Green component (0-1)",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0
+                },
+                "b": {
+                  "type": "number",
+                  "description": "Blue component (0-1)",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0
+                },
+                "a": {
+                  "type": "number",
+                  "description": "Alpha/Transparency (0=transparent, 1=opaque)",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 1
+                }
+              }
+            }
+          }
+        },
+        "label": {
+          "type": "object",
+          "title": "Label",
+          "description": "Label settings for the bars",
+          "required": ["showLabel", "fontSize", "labelColor"],
+          "properties": {
+            "showLabel": {
+              "type": "boolean",
+              "title": "Show Label",
+              "description": "Whether to show labels",
+              "default": true
+            },
+            "fontSize": {
+              "type": "number",
+              "title": "Font Size",
+              "description": "Size of the label font",
+              "minimum": 0.01,
+              "maximum": 0.1,
+              "default": 0.04
+            },
+            "labelColor": {
+              "type": "object",
+              "title": "Label Color",
+              "description": "RGBA color for the label",
+              "required": ["r", "g", "b", "a"],
+              "properties": {
+                "r": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0
+                },
+                "g": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0
+                },
+                "b": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 0
+                },
+                "a": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "visualizer_settings": {
+      "type": "object",
+      "title": "Visualizer Settings",
+      "description": "Settings for the visualizer",
+      "required": ["barSettings", "containerSettings", "solverSettings"],
+      "properties": {
+        "barSettings": {
+          "type": "object",
+          "title": "Bar Settings",
+          "description": "Settings for bar arrangement",
+          "required": ["barSpacing", "containerOffset"],
+          "properties": {
+            "barSpacing": {
+              "type": "number",
+              "title": "Bar Spacing",
+              "description": "Space between bars",
+              "minimum": 0.01,
+              "maximum": 1,
+              "default": 0.051
+            },
+            "containerOffset": {
+              "type": "number",
+              "title": "Container Offset",
+              "description": "Offset of the container",
+              "minimum": -1,
+              "maximum": 1,
+              "default": -0.001
+            }
+          }
+        },
+        "containerSettings": {
+          "type": "object",
+          "title": "Container Settings",
+          "description": "Settings for the container",
+          "required": ["useWhiteFrame", "frameWidth", "framePadding"],
+          "properties": {
+            "useWhiteFrame": {
+              "type": "boolean",
+              "title": "Use White Frame",
+              "description": "Whether to use a white frame that wraps all bars",
+              "default": true
+            },
+            "frameWidth": {
+              "type": "number",
+              "title": "Frame Width",
+              "description": "Width of the frame",
+              "minimum": 0.01,
+              "maximum": 1,
+              "default": 0.1
+            },
+            "framePadding": {
+              "type": "number",
+              "title": "Frame Padding",
+              "description": "Padding of the frame",
+              "minimum": 0.01,
+              "maximum": 0.2,
+              "default": 0.029
+            }
+          }
+        },
+        "solverSettings": {
+          "type": "object",
+          "title": "Solver Settings",
+          "description": "Settings for the solver",
+          "required": ["useSolver", "solverType", "solverOffset", "orientToCamera"],
+          "properties": {
+            "useSolver": {
+              "type": "boolean",
+              "title": "Use Solver",
+              "description": "Whether to use the solver",
+              "default": true
+            },
+            "solverType": {
+              "type": "string",
+              "title": "Solver Type",
+              "description": "Type of solver to use",
+              "enum": ["RadialView"],
+              "default": "RadialView"
+            },
+            "solverOffset": {
+              "type": "object",
+              "title": "Position (Right-Hand Coordinate)",
+              "description": "Position in right-hand coordinate system (Y is front/back, Z is up/down, will be converted to Unity's left-hand system)",
+              "required": ["x", "y", "z"],
+              "properties": {
+                "x": {
+                  "type": "number",
+                  "description": "Left/Right movement (same in both coordinate systems)",
+                  "minimum": -1,
+                  "maximum": 1,
+                  "default": 0
+                },
+                "y": {
+                  "type": "number",
+                  "description": "Front/Back movement (maps to Unity's Z axis)",
+                  "minimum": -1,
+                  "maximum": 1,
+                  "default": 0
+                },
+                "z": {
+                  "type": "number",
+                  "description": "Up/Down movement (maps to Unity's Y axis)",
+                  "minimum": 0.1,
+                  "maximum": 3,
+                  "default": 0.3,
+                  "x-key-parameter": true,
+                  "x-display-name": "Distance"
+                }
+              }
+            },
+            "orientToCamera": {
+              "type": "boolean",
+              "title": "Orient To Camera",
+              "description": "Whether to orient to the camera",
+              "default": true
+            }
+          }
+        }
+      }
+    },
+    "zeromq_settings": {
+      "type": "object",
+      "title": "ZeroMQ Settings",
+      "description": "Settings for ZeroMQ connection",
+      "required": ["connectionSettings", "subscriptionFilter"],
+      "properties": {
+        "connectionSettings": {
+          "type": "object",
+          "title": "Connection Settings",
+          "description": "Settings for ZeroMQ connection",
+          "required": ["serverIp", "port"],
+          "properties": {
+            "serverIp": {
+              "type": "string",
+              "title": "Server IP",
+              "description": "IP address of the ZeroMQ server",
+              "pattern": "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$",
+              "default": "192.168.10.142"
+            },
+            "port": {
+              "type": "integer",
+              "title": "Port",
+              "description": "Port number for ZeroMQ connection",
+              "minimum": 1,
+              "maximum": 65535,
+              "default": 5555
+            }
+          }
+        },
+        "subscriptionFilter": {
+          "type": "string",
+          "title": "Subscription Filter",
+          "description": "Filter for ZeroMQ subscription",
+          "default": ""
+        }
+      }
+    }
+  }
+}

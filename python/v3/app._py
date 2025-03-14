@@ -1,0 +1,735 @@
+#!/usr/bin/env python
+from flask import Flask, render_template, jsonify, request, send_from_directory
+import json
+import os
+import base64
+import requests
+import traceback
+import yaml
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Load config for static folder path
+config_path = Path(__file__).parent / 'config.yaml'
+with open(config_path, 'r') as f:
+    config = yaml.safe_load(f)
+    # Replace ${base_path} with actual path
+    config['static_path'] = config['static_path'].replace('${base_path}', config['base_path'])
+    config['templates_path'] = config['templates_path'].replace('${base_path}', config['base_path'])
+
+app = Flask(__name__, 
+            static_folder=config['static_path'],
+            template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates'))
+
+# GitHub configuration
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
+OWNER = "DongjuneChang"
+REPO = "AR"
+CONFIG_PATH = "AR_info_data/visualization/two_bar_step_visualization_config.json"
+OVERRIDES_PATH = "AR_info_data/visualization/visualization_overrides.json"
+
+# Load JSON Schema
+SCHEMA_PATH = Path(__file__).parent / 'schema.json'
+
+def load_schema():
+    """Load and parse the JSON schema"""
+    try:
+        with open(SCHEMA_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading schema: {e}")
+        return None
+
+@app.before_request
+def before_request():
+    """Log details about each request"""
+    print(f"\nIncoming {request.method} request to {request.path}")
+    print(f"Headers: {dict(request.headers)}")
+    print(f"Static folder: {app.static_folder}")
+    print(f"Template folder: {app.template_folder}")
+    if request.path.startswith('/static/'):
+        print(f"Looking for static file: {os.path.join(app.static_folder, request.path[8:])}")
+    if request.data:
+        print(f"Request data: {request.data.decode('utf-8')}")
+
+def validate_config(config, schema):
+    """Validate configuration against schema"""
+    try:
+        from jsonschema import validate, ValidationError, SchemaError
+        
+        try:
+            validate(instance=config, schema=schema)
+            return True, None
+        except ValidationError as e:
+            # Get the path to the error
+            path = ' -> '.join(str(p) for p in e.path)
+            message = f"Validation error at {path}: {e.message}"
+            return False, message
+        except SchemaError as e:
+            return False, f"Schema error: {str(e)}"
+    except ImportError:
+        print("Warning: jsonschema not installed, skipping validation")
+        return True, None
+
+def get_nested_diff(old_dict, new_dict, path=""):
+    """Find differences between two nested dictionaries"""
+    changes = []
+    
+    for key in new_dict:
+        new_path = f"{path}.{key}" if path else key
+        
+        if key not in old_dict:
+            changes.append({
+                'path': new_path,
+                'old': None,
+                'new': new_dict[key]
+            })
+        elif isinstance(new_dict[key], dict) and isinstance(old_dict[key], dict):
+            changes.extend(get_nested_diff(old_dict[key], new_dict[key], new_path))
+        elif new_dict[key] != old_dict[key]:
+            changes.append({
+                'path': new_path,
+                'old': old_dict[key],
+                'new': new_dict[key]
+            })
+    
+    return changes
+
+def extract_key_parameters(schema):
+    """Extract key parameters from schema for simplified view"""
+    key_params = []
+    
+    # Function to recursively search for key parameters
+    def search_schema(schema_part, path="", in_properties=False):
+        if isinstance(schema_part, dict):
+            # Check if this is a property with x-key-parameter flag
+            if schema_part.get('x-key-parameter') == True:
+                display_name = schema_part.get('x-display-name', path.split('.')[-1])
+                key_params.append({
+                    'path': path,
+                    'display_name': display_name,
+                    'schema': schema_part
+                })
+            
+            # Recursively search properties
+            for key, value in schema_part.items():
+                # Skip the 'properties' key in the path
+                if key == 'properties':
+                    search_schema(value, path, True)
+                else:
+                    new_path = f"{path}.{key}" if path else key
+                    search_schema(value, new_path, in_properties)
+    
+    # Start search from properties
+    if 'properties' in schema:
+        for key, value in schema['properties'].items():
+            search_schema(value, key)
+    
+    return key_params
+
+@app.route('/')
+@app.route('/editor')
+def index():
+    """Serve the editor page"""
+    print("\nServing editor.html")
+    print(f"Current directory: {os.getcwd()}")
+    print(f"Template folder: {app.template_folder}")
+    print(f"Static folder: {app.static_folder}")
+    schema = load_schema()
+    if not schema:
+        return "Error: Could not load schema", 500
+    
+    # Extract key parameters for simplified view
+    key_params = extract_key_parameters(schema)
+    
+    try:
+        return render_template('editor.html', schema=schema, key_params=key_params)
+    except Exception as e:
+        print(f"Error rendering template: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return f"Error: {str(e)}", 500
+
+@app.route('/schema')
+def get_schema():
+    """Get the JSON schema"""
+    schema = load_schema()
+    if not schema:
+        return jsonify({'error': 'Could not load schema'}), 500
+    return jsonify(schema)
+
+@app.route('/key-parameters')
+def get_key_parameters():
+    """Get the key parameters for simplified view"""
+    schema = load_schema()
+    if not schema:
+        return jsonify({'error': 'Could not load schema'}), 500
+    
+    key_params = extract_key_parameters(schema)
+    return jsonify(key_params)
+
+@app.route('/overrides-editor')
+def overrides_editor():
+    """Serve the overrides editor page"""
+    print("\nServing overrides.html")
+    return render_template('overrides.html')
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serve static files"""
+    print(f"\nServing static file: {filename}")
+    print(f"Static folder: {app.static_folder}")
+    full_path = os.path.join(app.static_folder, filename)
+    print(f"Full path: {full_path}")
+    print(f"File exists: {os.path.exists(full_path)}")
+    if os.path.exists(full_path):
+        print(f"File permissions: {oct(os.stat(full_path).st_mode)[-3:]}")
+    try:
+        return send_from_directory(app.static_folder, filename)
+    except Exception as e:
+        print(f"Error serving static file: {str(e)}")
+        print(f"Trying alternate path...")
+        alt_path = os.path.join(current_dir, 'static')
+        print(f"Alternate path: {alt_path}")
+        return send_from_directory(alt_path, filename)
+
+@app.route('/overrides', methods=['GET'])
+def get_overrides():
+    """Get visualization overrides from GitHub"""
+    try:
+        print(f"\nGET /overrides")
+        print(f"GITHUB_TOKEN length: {len(GITHUB_TOKEN) if GITHUB_TOKEN else 0}")
+        print(f"Token exists: {bool(GITHUB_TOKEN)}")
+        
+        if not GITHUB_TOKEN:
+            print("Error: GitHub token not found")
+            return jsonify({'error': 'GitHub token not found in environment variables'}), 500
+        
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        url = f"https://api.github.com/repos/{OWNER}/{REPO}/contents/{OVERRIDES_PATH}"
+        print(f"Requesting URL: {url}")
+        print(f"Request headers: {headers}")
+        
+        response = requests.get(url, headers=headers)
+        print(f"GitHub API Response Status: {response.status_code}")
+        print(f"GitHub API Response Headers: {dict(response.headers)}")
+        print(f"GitHub API Response: {response.text}")
+        
+        if response.status_code != 200:
+            print(f"GitHub API Error Response: {response.text}")
+            return jsonify({
+                'details': response.text,
+                'url': url
+            }), response.status_code
+        
+        data = response.json()
+        content = base64.b64decode(data['content']).decode('utf-8')
+        print("Successfully fetched and decoded content")
+        print(f"Content: {content}")
+        
+        return jsonify({
+            'content': content,
+            'sha': data['sha']
+        })
+    except Exception as e:
+        print(f"Exception in get_overrides: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': 'Internal server error',
+            'details': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/overrides', methods=['POST'])
+def update_overrides():
+    """Update visualization overrides on GitHub"""
+    try:
+        print("\nPOST /overrides - Received request")
+        print(f"GITHUB_TOKEN length: {len(GITHUB_TOKEN) if GITHUB_TOKEN else 0}")
+        
+        if not GITHUB_TOKEN:
+            print("Error: GitHub token not found")
+            return jsonify({'error': 'GitHub token not found in environment variables'}), 500
+        
+        data = request.json
+        print(f"Request data: {json.dumps(data, indent=2)}")
+        
+        if not data.get('content') or not data.get('sha'):
+            return jsonify({
+                'error': 'Missing required fields',
+                'details': 'Both content and sha fields are required'
+            }), 400
+            
+        # Parse and validate the content
+        try:
+            content_json = json.loads(data['content'])
+            if not isinstance(content_json, dict) or 'visualization_overrides' not in content_json:
+                return jsonify({
+                    'error': 'Invalid content structure',
+                    'details': 'Content must contain visualization_overrides object'
+                }), 400
+            
+            required_fields = ['colors', 'centroidPosition', 'enabled']
+            for field in required_fields:
+                if field not in content_json['visualization_overrides']:
+                    return jsonify({
+                        'error': 'Missing required field in visualization_overrides',
+                        'details': f'Field {field} is required'
+                    }), 400
+            
+            # Validate colors structure
+            colors = content_json['visualization_overrides']['colors']
+            if not isinstance(colors, dict):
+                return jsonify({
+                    'error': 'Invalid colors structure',
+                    'details': 'colors must be an object'
+                }), 400
+            
+            # At least one color must be defined
+            if not any(key in colors for key in ['frameBackground', 'barBackground', 'barForeground']):
+                return jsonify({
+                    'error': 'Invalid colors structure',
+                    'details': 'At least one of frameBackground, barBackground, or barForeground must be defined'
+                }), 400
+            
+            # Validate each color structure
+            for color_key, color_value in colors.items():
+                if color_value is not None:  # Allow null values for colors
+                    for component in ['r', 'g', 'b', 'a']:
+                        if component not in color_value or not isinstance(color_value[component], (int, float)):
+                            return jsonify({
+                                'error': f'Invalid {color_key} structure',
+                                'details': f'{color_key} must contain numeric {component} value'
+                            }), 400
+                
+            # Validate centroidPosition structure
+            pos = content_json['visualization_overrides']['centroidPosition']
+            for coord in ['x', 'y', 'z']:
+                if coord not in pos or not isinstance(pos[coord], (int, float)):
+                    return jsonify({
+                        'error': 'Invalid centroidPosition structure',
+                        'details': f'centroidPosition must contain numeric {coord} value'
+                    }), 400
+        except json.JSONDecodeError as e:
+            return jsonify({
+                'error': 'Invalid JSON content',
+                'details': str(e)
+            }), 400
+        
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        
+        payload = {
+            "message": "Update visualization overrides",
+            "content": base64.b64encode(data['content'].encode()).decode(),
+            "sha": data['sha']
+        }
+        
+        url = f"https://api.github.com/repos/{OWNER}/{REPO}/contents/{OVERRIDES_PATH}"
+        print(f"Sending PUT request to: {url}")
+        print(f"Request headers: {headers}")
+        print(f"Request payload: {json.dumps(payload, indent=2)}")
+        
+        response = requests.put(url, headers=headers, json=payload)
+        print(f"GitHub API Response Status: {response.status_code}")
+        print(f"GitHub API Response Headers: {dict(response.headers)}")
+        print(f"GitHub API Response: {response.text}")
+        
+        if response.status_code not in [200, 201]:
+            print(f"GitHub API Error Response: {response.text}")
+            error_data = response.json() if response.text else {}
+            return jsonify({
+                'success': False,
+                'error': f"GitHub API returned status code {response.status_code}",
+                'details': error_data.get('message', response.text)
+            })
+        
+        print("Successfully updated overrides")
+        return jsonify({
+            "success": True,
+            "message": "Successfully updated visualization overrides"
+        })
+    except Exception as e:
+        print(f"Exception in update_overrides: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': 'Internal server error',
+            'details': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/config', methods=['GET'])
+def get_config():
+    """Get configuration from GitHub"""
+    try:
+        print(f"\nGET /config")
+        print(f"GITHUB_TOKEN length: {len(GITHUB_TOKEN) if GITHUB_TOKEN else 0}")
+        print(f"Token exists: {bool(GITHUB_TOKEN)}")
+        
+        if not GITHUB_TOKEN:
+            print("Error: GitHub token not found")
+            return jsonify({'error': 'GitHub token not found in environment variables'}), 500
+        
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        url = f"https://api.github.com/repos/{OWNER}/{REPO}/contents/{CONFIG_PATH}"
+        print(f"Requesting URL: {url}")
+        print(f"Request headers: {headers}")
+        
+        response = requests.get(url, headers=headers)
+        print(f"GitHub API Response Status: {response.status_code}")
+        print(f"GitHub API Response Headers: {dict(response.headers)}")
+        print(f"GitHub API Response: {response.text}")
+        
+        if response.status_code != 200:
+            print(f"GitHub API Error Response: {response.text}")
+            return jsonify({
+                'error': 'Failed to fetch config from GitHub',
+                'details': response.text,
+                'url': url
+            }), response.status_code
+        
+        data = response.json()
+        content = base64.b64decode(data['content']).decode('utf-8')
+        print("Successfully fetched and decoded content")
+        print(f"Content: {content}")
+        
+        # Fix JSON formatting by parsing and re-serializing
+        def fix_json(content):
+            # First, ensure all property names are quoted
+            import re
+            content = re.sub(r'(\n\s*)(\w+):', r'\1"\2":', content)
+            
+            # Split into lines and process
+            lines = content.splitlines()
+            result = []
+            in_object = 0  # Track nested object depth
+            
+            for i, line in enumerate(lines):
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Track object depth
+                if '{' in line:
+                    in_object += 1
+                if '}' in line:
+                    in_object -= 1
+                
+                # Add comma if needed
+                if i < len(lines) - 1:
+                    next_line = lines[i + 1].strip()
+                    
+                    # Need comma if:
+                    # 1. Current line contains a value (number, string, boolean, null)
+                    # 2. Current line ends with a closing brace/bracket
+                    # 3. Next line is not a closing brace/bracket
+                    needs_comma = False
+                    
+                    if (re.search(r':\s*[0-9.-]+\s*$', line) or  # number
+                        re.search(r':\s*"[^"]*"\s*$', line) or   # string
+                        re.search(r':\s*(true|false|null)\s*$', line) or  # boolean/null
+                        line.endswith('}') or line.endswith(']')):  # closing brace/bracket
+                        
+                        if not (next_line.startswith('}') or 
+                               next_line.startswith(']') or 
+                               line.endswith(',') or
+                               line.endswith('{') or 
+                               line.endswith('[')):
+                            needs_comma = True
+                    
+                    if needs_comma:
+                        line += ','
+                
+                result.append(line)
+            
+            content = '\n'.join(result)
+            
+            try:
+                # Try to parse the JSON
+                data = json.loads(content)
+                
+                # Convert string numbers and fix backgroundColor structure
+                def fix_data_structure(data):
+                    # Fix backgroundColor structure
+                    if 'bar_style' in data and isinstance(data['bar_style'], dict):
+                        bar_style = data['bar_style']
+                        if 'colors' in bar_style and isinstance(bar_style['colors'], dict):
+                            colors = bar_style['colors']
+                            if 'backgroundColor' in colors and isinstance(colors['backgroundColor'], dict):
+                                bg = colors['backgroundColor']
+                                if all(k in bg for k in ['r', 'g', 'b', 'a']):
+                                    if isinstance(bg['r'], dict) and 'r' in bg['r']:
+                                        # Create new backgroundColor object
+                                        new_bg = {
+                                            'r': float(bg['r']['r']),
+                                            'g': float(bg['g']['r']),
+                                            'b': float(bg['b']['r']),
+                                            'a': float(bg['a']['r'])
+                                        }
+                                        # Replace old backgroundColor with new one
+                                        colors['backgroundColor'] = new_bg
+
+                    # Fix solverOffset.z
+                    if 'visualizer_settings' in data and isinstance(data['visualizer_settings'], dict):
+                        vis_settings = data['visualizer_settings']
+                        if 'solverSettings' in vis_settings and isinstance(vis_settings['solverSettings'], dict):
+                            solver_settings = vis_settings['solverSettings']
+                            if 'solverOffset' in solver_settings and isinstance(solver_settings['solverOffset'], dict):
+                                offset = solver_settings['solverOffset']
+                                if 'z' in offset and isinstance(offset['z'], str):
+                                    try:
+                                        # Convert z value to float
+                                        offset['z'] = float(offset['z'])
+                                    except ValueError:
+                                        pass
+
+                    # Process all values recursively
+                    def process_value(v):
+                        if isinstance(v, dict):
+                            # Process each key-value pair in the dictionary
+                            for k2, v2 in list(v.items()):
+                                v[k2] = process_value(v2)
+                            return v
+                        elif isinstance(v, list):
+                            # Process each item in the list
+                            return [process_value(x) for x in v]
+                        elif isinstance(v, str):
+                            try:
+                                # Convert string to number if possible
+                                if '.' in v:
+                                    return float(v)
+                                return int(v)
+                            except ValueError:
+                                return v
+                        return v
+
+                    # Process all values in the dictionary
+                    for k, v in list(data.items()):
+                        data[k] = process_value(v)
+
+                    return data
+                
+                data = fix_data_structure(data)
+                
+                # Re-serialize with proper formatting
+                return json.dumps(data, indent=2)
+            except json.JSONDecodeError as e:
+                print(f"First attempt failed: {str(e)}")
+                try:
+                    # More aggressive fixes
+                    content = re.sub(r'}\s*\n\s*"', '},\n"', content)  # Add commas between objects
+                    content = re.sub(r'}\s*\n\s*}', '}\n}', content)   # Remove commas before closing braces
+                    content = re.sub(r',(\s*[}\]])', r'\1', content)   # Remove trailing commas
+                    data = json.loads(content)
+                    data = convert_string_numbers(data)  # Convert string numbers here too
+                    return json.dumps(data, indent=2)
+                except json.JSONDecodeError as e:
+                    print(f"Second attempt failed: {str(e)}")
+                    print("Content after fixes:", content)
+                    raise
+
+        # Apply the fix
+        try:
+            content = fix_json(content)
+        except Exception as e:
+            print(f"Error fixing JSON: {str(e)}")
+            print("Original content:", content)
+            raise
+        
+        # Parse JSON to validate format
+        json_content = json.loads(content)
+        
+        # Validate against schema (temporarily disabled for debugging)
+        schema = load_schema()
+        if schema:
+            is_valid, error = validate_config(json_content, schema)
+            if not is_valid:
+                print(f"Validation error: {error}")
+                print(f"Configuration: {json.dumps(json_content, indent=2)}")
+                # Temporarily disabled for debugging
+                # return jsonify({
+                #     'error': 'Configuration does not match schema',
+                #     'details': error
+                # }), 400
+        
+        return jsonify({
+            'content': content,
+            'sha': data['sha']
+        })
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {str(e)}")
+        return jsonify({
+            'error': 'Invalid JSON format',
+            'details': str(e)
+        }), 400
+    except Exception as e:
+        print(f"Exception in get_config: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': 'Internal server error',
+            'details': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/config', methods=['POST'])
+def update_config():
+    """Update configuration on GitHub"""
+    try:
+        data = request.json
+        print(f"Request data: {json.dumps(data, indent=2)}")
+        
+        if not data.get('content') or not data.get('sha'):
+            return jsonify({
+                'error': 'Missing required fields',
+                'details': 'Both content and sha fields are required'
+            }), 400
+        
+        # Parse and validate JSON
+        config = json.loads(data['content'])
+        schema = load_schema()
+        if schema:
+            is_valid, error = validate_config(config, schema)
+            if not is_valid:
+                return jsonify({
+                    'error': 'Configuration does not match schema',
+                    'details': error
+                }), 400
+        
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        
+        payload = {
+            "message": "Update visualization config",
+            "content": base64.b64encode(data['content'].encode()).decode(),
+            "sha": data['sha']
+        }
+        
+        url = f"https://api.github.com/repos/{OWNER}/{REPO}/contents/{CONFIG_PATH}"
+        print(f"Sending PUT request to: {url}")
+        print(f"Request headers: {headers}")
+        print(f"Request payload: {json.dumps(payload, indent=2)}")
+        
+        response = requests.put(url, headers=headers, json=payload)
+        print(f"GitHub API Response Status: {response.status_code}")
+        print(f"GitHub API Response Headers: {dict(response.headers)}")
+        print(f"GitHub API Response: {response.text}")
+        
+        if response.status_code not in [200, 201]:
+            print(f"GitHub API Error Response: {response.text}")
+            return jsonify({
+                'success': False,
+                'error': f"GitHub API returned status code {response.status_code}",
+                'details': response.text
+            })
+        
+        print("Successfully updated configuration")
+        return jsonify({"success": True})
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {str(e)}")
+        return jsonify({'error': f'Invalid JSON: {str(e)}'}), 400
+    except Exception as e:
+        print(f"Exception in update_config: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/update-key-parameters', methods=['POST'])
+def update_key_parameters():
+    """Update only the key parameters in the configuration"""
+    try:
+        print("\nPOST /update-key-parameters - Received request")
+        
+        data = request.json
+        print(f"Request data: {json.dumps(data, indent=2)}")
+        
+        if not data.get('parameters') or not data.get('sha'):
+            return jsonify({
+                'error': 'Missing required fields',
+                'details': 'Both parameters and sha fields are required'
+            }), 400
+        
+        # Get current configuration
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        url = f"https://api.github.com/repos/{OWNER}/{REPO}/contents/{CONFIG_PATH}"
+        
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            return jsonify({
+                'error': 'Failed to fetch current config from GitHub',
+                'details': response.text
+            }), response.status_code
+        
+        github_data = response.json()
+        current_content = base64.b64decode(github_data['content']).decode('utf-8')
+        current_config = json.loads(current_content)
+        
+        # Update only the key parameters
+        for param in data['parameters']:
+            path_parts = param['path'].split('.')
+            target = current_config
+            
+            # Navigate to the target object
+            for i, part in enumerate(path_parts):
+                if i == len(path_parts) - 1:
+                    # Last part, update the value
+                    target[part] = param['value']
+                else:
+                    # Navigate deeper
+                    target = target[part]
+        
+        # Prepare updated content
+        updated_content = json.dumps(current_config, indent=2)
+        
+        # Update on GitHub
+        payload = {
+            "message": "Update key visualization parameters",
+            "content": base64.b64encode(updated_content.encode()).decode(),
+            "sha": data['sha']
+        }
+        
+        response = requests.put(url, headers=headers, json=payload)
+        if response.status_code not in [200, 201]:
+            return jsonify({
+                'success': False,
+                'error': f"GitHub API returned status code {response.status_code}",
+                'details': response.text
+            })
+        
+        print("Successfully updated key parameters")
+        return jsonify({
+            "success": True,
+            "content": updated_content,
+            "sha": response.json()['content']['sha']
+        })
+    except Exception as e:
+        print(f"Exception in update_key_parameters: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+if __name__ == '__main__':
+    print("\nStarting server...")
+    print(f"GITHUB_TOKEN exists: {bool(GITHUB_TOKEN)}")
+    print(f"GITHUB_TOKEN length: {len(GITHUB_TOKEN) if GITHUB_TOKEN else 0}")
+    print(f"CONFIG_PATH: {CONFIG_PATH}")
+    print(f"Full GitHub URL: https://api.github.com/repos/{OWNER}/{REPO}/contents/{CONFIG_PATH}")
+    app.run(debug=True, port=5000)

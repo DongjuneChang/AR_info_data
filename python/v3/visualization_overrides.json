@@ -1,0 +1,11 @@
+{
+  "visualization_overrides": {
+    "colors": {
+      "frameBackground": { "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0 },
+      "barBackground": { "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0 },
+      "barForeground": { "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0 }
+    },
+    "centroidPosition": { "x": 0.0, "y": 1.5, "z": 0.0 },
+    "enabled": true
+  }
+}

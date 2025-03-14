@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Visualization Overrides Editor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <div class="form-container">
+        <h1>Visualization Overrides Editor</h1>
+        
+        <div class="button-container">
+            <button class="reload-button" onclick="loadFromGitHub()">Load from GitHub</button>
+            <button class="save-button" onclick="saveToGitHub()">Save Changes</button>
+        </div>
+
+        <div class="section">
+            <h2>Color Settings</h2>
+            <div class="field">
+                <label>Target Element:</label>
+                <select id="color-target-selector" style="margin-bottom: 10px;">
+                    <!-- Options will be populated dynamically -->
+                </select>
+            </div>
+            <div class="field">
+                <label>Color:</label>
+                <div id="color-picker"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Centroid Position</h2>
+            <div class="field">
+                <label>Left/Right (X-axis, meters):</label>
+                <div class="position-control">
+                    <input type="range" id="position-x" min="-1.0" max="1.0" step="0.1" value="0.0">
+                    <span id="position-x-value">0.0</span>
+                </div>
+                <small>Same as Unity X-axis</small>
+            </div>
+            <div class="field">
+                <label>Front/Back (Y-axis, meters):</label>
+                <div class="position-control">
+                    <input type="range" id="position-y" min="0.1" max="3.0" step="0.1" value="1.5">
+                    <span id="position-y-value">1.5</span>
+                </div>
+                <small>Maps to Unity Z-axis (front/back distance)</small>
+            </div>
+            <div class="field">
+                <label>Up/Down (Z-axis, meters):</label>
+                <div class="position-control">
+                    <input type="range" id="position-z" min="-1.0" max="1.0" step="0.1" value="0.0">
+                    <span id="position-z-value">0.0</span>
+                </div>
+                <small>Maps to Unity Y-axis (up/down height)</small>
+            </div>
+            <div class="coordinate-info">
+                <p><strong>Coordinate System Mapping:</strong></p>
+                <ul>
+                    <li>Web X-axis → Unity X-axis (left/right)</li>
+                    <li>Web Y-axis → Unity Z-axis (front/back)</li>
+                    <li>Web Z-axis → Unity Y-axis (up/down)</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div id="status" class="status-message"></div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/components/color-picker.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/form-generator.js') }}"></script>
+    
+    <script>
+        let currentSha;
+        let currentOverrides;
+        let colorPickerInstance;
+        
+        // 기본 색상 키 설정
+        const defaultColorKeys = ['frameBackground', 'barBackground', 'barForeground'];
+        
+        // 기본 오버라이드 설정
+        const defaultOverrides = {
+            visualization_overrides: {
+                colors: {
+                    frameBackground: { r: 0.2, g: 0.2, b: 0.2, a: 1.0 },
+                    barBackground: { r: 0.8, g: 0.8, b: 0.8, a: 1.0 },
+                    barForeground: { r: 0.0, g: 0.7, b: 1.0, a: 1.0 }
+                },
+                centroidPosition: {
+                    x: 0.0,
+                    y: 1.5,
+                    z: 0.0
+                },
+                enabled: true
+            }
+        };
+        
+        // Initialize form when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFromGitHub();
+            
+            // Add event listener for color target selector
+            document.getElementById('color-target-selector').addEventListener('change', function(event) {
+                console.log('Dropdown changed to:', event.target.value);
+                updateColorPicker();
+            });
+        });
+
+        // Fix for dropdown selection
+        document.addEventListener('click', function(event) {
+            // Check if the click was on an option in the dropdown
+            if (event.target.tagName === 'OPTION' && event.target.parentElement.id === 'color-target-selector') {
+                // Set the dropdown value to the clicked option's value
+                document.getElementById('color-target-selector').value = event.target.value;
+                // Trigger the change event
+                const changeEvent = new Event('change');
+                document.getElementById('color-target-selector').dispatchEvent(changeEvent);
+                // Close the dropdown
+                document.getElementById('color-target-selector').blur();
+            }
+        });
+        
+        // 색상 선택기 채우기 함수
+        function populateColorSelector(colorKeys) {
+            const selector = document.getElementById('color-target-selector');
+            selector.innerHTML = ''; // Clear existing options
+            
+            colorKeys.forEach(key => {
+                const option = document.createElement('option');
+                option.value = key;
+                // Format camelCase to Title Case with spaces
+                option.textContent = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+                selector.appendChild(option);
+            });
+            
+            updateColorPicker();
+        }
+        
+        function loadFromGitHub() {
+            showStatus('Loading data from GitHub...', true);
+            
+            // Fetch both overrides and color keys
+            Promise.all([
+                fetch('/overrides').then(response => response.json()),
+                fetch('/color-keys').then(response => response.json())
+            ])
+            .then(([overridesData, colorKeysData]) => {
+                // Handle overrides data
+                if (overridesData.error) {
+                    console.error('Overrides error:', overridesData.error);
+                    showStatus('Using default overrides: ' + overridesData.error, false);
+                    currentOverrides = defaultOverrides;
+                } else {
+                    currentOverrides = JSON.parse(overridesData.content);
+                    currentSha = overridesData.sha;
+                }
+                
+                // Handle color keys data
+                if (colorKeysData.error) {
+                    console.error('Color keys error:', colorKeysData.error);
+                    showStatus('Using default color keys: ' + colorKeysData.error, false);
+                    populateColorSelector(defaultColorKeys);
+                } else {
+                    populateColorSelector(colorKeysData.color_keys);
+                }
+                
+                // Initialize position sliders
+                const position = currentOverrides.visualization_overrides.centroidPosition;
+                document.getElementById('position-x').value = position.x;
+                document.getElementById('position-y').value = position.y;
+                document.getElementById('position-z').value = position.z;
+                document.getElementById('position-x-value').textContent = position.x.toFixed(2);
+                document.getElementById('position-y-value').textContent = position.y.toFixed(2);
+                document.getElementById('position-z-value').textContent = position.z.toFixed(2);
+                
+                showStatus('Data loaded successfully', true);
+            })
+            .catch(error => {
+                console.error('Failed to load data:', error);
+                showStatus('Using default settings: ' + error, false);
+                
+                // Use default values
+                currentOverrides = defaultOverrides;
+                populateColorSelector(defaultColorKeys);
+                
+                // Initialize position sliders with default values
+                const position = defaultOverrides.visualization_overrides.centroidPosition;
+                document.getElementById('position-x').value = position.x;
+                document.getElementById('position-y').value = position.y;
+                document.getElementById('position-z').value = position.z;
+                document.getElementById('position-x-value').textContent = position.x.toFixed(2);
+                document.getElementById('position-y-value').textContent = position.y.toFixed(2);
+                document.getElementById('position-z-value').textContent = position.z.toFixed(2);
+            });
+        }
+        
+        function updateColorPicker() {
+            const colorTarget = document.getElementById('color-target-selector').value;
+            console.log('Selected color target:', colorTarget);
+            let currentColor;
+            
+            if (currentOverrides && currentOverrides.visualization_overrides.colors) {
+                currentColor = currentOverrides.visualization_overrides.colors[colorTarget];
+                console.log('Current color from overrides:', currentColor);
+            }
+            
+            if (!currentColor) {
+                currentColor = {
+                    r: 1.0,
+                    g: 1.0,
+                    b: 1.0,
+                    a: 1.0
+                };
+                console.log('Using default color');
+            }
+            
+            colorPickerInstance = new ColorPicker(currentColor);
+            const container = document.getElementById('color-picker');
+            container.innerHTML = '';
+            container.appendChild(colorPickerInstance.element);
+        }
+        
+        function saveToGitHub() {
+            showStatus('Saving changes...', true);
+            
+            // Get color and transparency
+            const colorTarget = document.getElementById('color-target-selector').value;
+            const selectedColor = colorPickerInstance.getValue();
+            
+            // Get positions
+            const positionX = parseFloat(document.getElementById('position-x').value);
+            const positionY = parseFloat(document.getElementById('position-y').value);
+            const positionZ = parseFloat(document.getElementById('position-z').value);
+            
+            // Create the overrides object with the correct structure
+            const overridesData = {
+                visualization_overrides: {
+                    colors: {},
+                    centroidPosition: {
+                        x: positionX,
+                        y: positionY,
+                        z: positionZ
+                    },
+                    enabled: true
+                }
+            };
+            
+            // Copy existing colors if available
+            if (currentOverrides && currentOverrides.visualization_overrides && currentOverrides.visualization_overrides.colors) {
+                Object.assign(overridesData.visualization_overrides.colors, currentOverrides.visualization_overrides.colors);
+            }
+            
+            // Update the selected color
+            overridesData.visualization_overrides.colors[colorTarget] = selectedColor;
+            
+            console.log('Saving overrides:', overridesData);
+            
+            fetch('/overrides', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: JSON.stringify(overridesData, null, 2),
+                    sha: currentSha
+                })
+            })
+            .then(response => {
+                console.log('Server response:', response);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Server data:', data);
+                if (data.error) {
+                    showStatus(data.error, false);
+                    console.error('Error saving overrides:', data.error);
+                    return;
+                }
+                if (data.success) {
+                    showStatus('Changes saved successfully', true);
+                    console.log('Successfully saved overrides');
+                    loadFromGitHub();  // Reload to get new SHA
+                } else {
+                    showStatus('Failed to save changes', false);
+                    console.error('Failed to save overrides:', data);
+                }
+            })
+            .catch(error => {
+                console.error('Error saving overrides:', error);
+                showStatus('Failed to save changes: ' + error, false);
+            });
+        }
+        
+        // Position slider event listeners
+        document.getElementById('position-x').addEventListener('input', function() {
+            document.getElementById('position-x-value').textContent = parseFloat(this.value).toFixed(2);
+        });
+        document.getElementById('position-y').addEventListener('input', function() {
+            document.getElementById('position-y-value').textContent = parseFloat(this.value).toFixed(2);
+        });
+        document.getElementById('position-z').addEventListener('input', function() {
+            document.getElementById('position-z-value').textContent = parseFloat(this.value).toFixed(2);
+        });
+        
+        function showStatus(message, isSuccess) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status-message ' + (isSuccess ? 'status-success' : 'status-error');
+            status.style.display = 'block';
+            
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

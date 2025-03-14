@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TwoBarVisualizer Config Editor v3</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <div class="form-container">
+        <h1>TwoBarVisualizer Config Editor v3</h1>
+        
+        <!-- Tab Navigation -->
+        <div class="tab-container">
+            <div class="tab-nav">
+                <button class="tab-button active" data-tab="simple">Simple Editor</button>
+                <button class="tab-button" data-tab="advanced">Advanced Editor</button>
+            </div>
+            
+            <div class="button-container">
+                <button class="save-button" onclick="saveChanges()">Save Changes</button>
+                <button class="reload-button" onclick="reloadFromGitHub()">Reload from GitHub</button>
+            </div>
+            
+            <!-- Simple Editor Tab (Key Parameters) -->
+            <div class="tab-content active" id="simple-tab">
+                <div class="simple-editor">
+                    <h2>Key Parameters</h2>
+                    <p class="description">Edit the most important visualization parameters</p>
+                    
+                    <!-- Background Color Section -->
+                    <div class="section">
+                        <h3>Background Color</h3>
+                        <div class="field">
+                            <label>Color and Transparency</label>
+                            <div id="background-color-picker"></div>
+                        </div>
+                    </div>
+
+                    <!-- Position Section -->
+                    <div class="section">
+                        <h3>Centroid Position</h3>
+                        <div class="field">
+                            <label>Distance (meters)</label>
+                            <div id="position-control"></div>
+                        </div>
+                    </div>
+
+                    <!-- Other Key Parameters -->
+                    <div id="key-params-form"></div>
+                </div>
+            </div>
+            
+            <!-- Advanced Editor Tab (Full Configuration) -->
+            <div class="tab-content" id="advanced-tab">
+                <div id="form-root"></div>
+            </div>
+        </div>
+        
+        <div id="status" class="status-message"></div>
+    </div>
+
+    <!-- Component Scripts -->
+    <script src="{{ url_for('static', filename='js/components/color-picker.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/number-input.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/components/position-control.js') }}"></script>
+    
+    <!-- Main Scripts -->
+    <script src="{{ url_for('static', filename='js/form-generator.js') }}"></script>
+    
+    <script>
+        // Global variables
+        let formGenerator;
+        let currentSha;
+        let currentConfig;
+        let keyParameters = [];
+        
+        // Tab switching functionality
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active class from all buttons and content
+                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                
+                // Add active class to clicked button and corresponding content
+                button.classList.add('active');
+                const tabId = button.getAttribute('data-tab') + '-tab';
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+        
+        // Reload configuration from GitHub
+        function reloadFromGitHub() {
+            showStatus('Loading configuration from GitHub...', true);
+            
+            fetch('/config')
+                .then(response => response.json())
+                .then(config => {
+                    if (config.error) {
+                        showStatus(config.error, false);
+                        return;
+                    }
+
+                    try {
+                        currentConfig = JSON.parse(config.content);
+                        currentSha = config.sha;
+                        
+                        // Update advanced form
+                        formGenerator.setFormData(currentConfig);
+                        
+                        // Update simple form
+                        updateKeyParametersForm();
+                        
+                        showStatus('Configuration reloaded from GitHub successfully', true);
+                    } catch (error) {
+                        showStatus('Failed to parse configuration: ' + error, false);
+                    }
+                })
+                .catch(error => showStatus('Failed to reload from GitHub: ' + error, false));
+        }
+        
+        // Save changes to GitHub
+        function saveChanges() {
+            try {
+                const activeTab = document.querySelector('.tab-button.active').getAttribute('data-tab');
+                
+                if (activeTab === 'simple') {
+                    // Save only key parameters
+                    saveKeyParameters();
+                } else {
+                    // Save full configuration
+                    saveFullConfiguration();
+                }
+            } catch (error) {
+                showStatus('Error preparing data: ' + error, false);
+            }
+        }
+        
+        // Save full configuration (advanced mode)
+        function saveFullConfiguration() {
+            showStatus('Saving full configuration...', true);
+            
+            // Get form data
+            const formData = formGenerator.getFormData();
+            
+            // Send to server
+            fetch('/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: JSON.stringify(formData, null, 2),
+                    sha: currentSha
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showStatus(data.error, false);
+                    return;
+                }
+                if (data.success) {
+                    showStatus('Configuration updated successfully', true);
+                    // Reload to get new SHA
+                    reloadFromGitHub();
+                } else {
+                    showStatus('Failed to update configuration', false);
+                }
+            })
+            .catch(error => showStatus('Failed to save changes: ' + error, false));
+        }
+        
+        // Save only key parameters (simple mode)
+        function saveKeyParameters() {
+            showStatus('Saving key parameters...', true);
+            
+            // Collect values from all simple form controls
+            const parameters = [];
+            
+            // Get background color value
+            const backgroundColorPicker = document.querySelector('#background-color-picker .color-picker');
+            if (backgroundColorPicker) {
+                const color = backgroundColorPicker.getValue();
+                parameters.push({
+                    path: 'bar_style.colors.backgroundColor',
+                    value: color
+                });
+            }
+
+            // Get position value
+            const positionControl = document.querySelector('#position-control .position-control');
+            if (positionControl) {
+                const value = positionControl.getValue();
+                parameters.push({
+                    path: 'visualizer_settings.solverSettings.solverOffset.z',
+                    value: value
+                });
+            }
+
+            // Get other key parameter values
+            document.querySelectorAll('#key-params-form [data-param-path]').forEach(input => {
+                let value;
+                
+                if (input.type === 'checkbox') {
+                    value = input.checked;
+                } else if (input.type === 'number' || input.classList.contains('number-input')) {
+                    value = parseFloat(input.value);
+                } else if (input.classList.contains('color-input')) {
+                    // Color picker has special handling
+                    const colorPicker = input.closest('.color-picker-container');
+                    if (colorPicker) {
+                        const r = parseFloat(colorPicker.querySelector('[data-color="r"]').value);
+                        const g = parseFloat(colorPicker.querySelector('[data-color="g"]').value);
+                        const b = parseFloat(colorPicker.querySelector('[data-color="b"]').value);
+                        const a = parseFloat(colorPicker.querySelector('[data-color="a"]').value);
+                        value = { r, g, b, a };
+                    } else {
+                        value = input.value;
+                    }
+                } else {
+                    value = input.value;
+                }
+                
+                parameters.push({
+                    path: input.getAttribute('data-param-path'),
+                    value: value
+                });
+            });
+            
+            // Send to server
+            fetch('/update-key-parameters', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    parameters: parameters,
+                    sha: currentSha
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showStatus(data.error, false);
+                    return;
+                }
+                if (data.success) {
+                    showStatus('Key parameters updated successfully', true);
+                    // Update current data
+                    currentConfig = JSON.parse(data.content);
+                    currentSha = data.sha;
+                    
+                    // Update advanced form
+                    formGenerator.setFormData(currentConfig);
+                } else {
+                    showStatus('Failed to update key parameters', false);
+                }
+            })
+            .catch(error => showStatus('Failed to save key parameters: ' + error, false));
+        }
+        
+        // Create and update the key parameters form
+        function updateKeyParametersForm() {
+            const container = document.getElementById('key-params-form');
+            container.innerHTML = '';
+            
+            // Create form fields for each key parameter
+            keyParameters.forEach(param => {
+                const field = document.createElement('div');
+                field.className = 'field';
+                
+                const label = document.createElement('label');
+                label.textContent = param.display_name || param.path.split('.').pop();
+                if (param.schema.description) {
+                    label.title = param.schema.description;
+                }
+                field.appendChild(label);
+                
+                let input;
+                
+                // Get the current value from the config
+                const pathParts = param.path.split('.');
+                let currentValue = currentConfig;
+                for (const part of pathParts) {
+                    if (currentValue && typeof currentValue === 'object') {
+                        currentValue = currentValue[part];
+                    } else {
+                        currentValue = null;
+                        break;
+                    }
+                }
+                
+                // Create appropriate input based on parameter type
+                if (param.path.includes('backgroundColor')) {
+                    // Special case for background color
+                    input = createColorPicker(param, currentValue);
+                    field.appendChild(input);
+                } else if (param.path.includes('solverOffset.z')) {
+                    // Special case for distance (position control)
+                    input = createPositionControl(param, currentValue);
+                    field.appendChild(input);
+                } else if (typeof currentValue === 'number') {
+                    // Number input for other numeric values
+                    input = createNumberInput(param, currentValue);
+                    field.appendChild(input);
+                } else if (typeof currentValue === 'boolean') {
+                    // Checkbox for boolean values
+                    input = document.createElement('input');
+                    input.type = 'checkbox';
+                    input.checked = currentValue;
+                    input.setAttribute('data-param-path', param.path);
+                    field.appendChild(input);
+                } else {
+                    // Text input for everything else
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = currentValue;
+                    input.setAttribute('data-param-path', param.path);
+                    field.appendChild(input);
+                }
+                
+                container.appendChild(field);
+            });
+        }
+        
+        // Create a color picker for the background color
+        function createColorPicker(param, value) {
+            const container = document.createElement('div');
+            container.className = 'color-picker-container';
+            
+            // Create the color picker component
+            const colorPicker = new ColorPicker({
+                r: value.r,
+                g: value.g,
+                b: value.b,
+                a: value.a
+            });
+            
+            // Set data attribute for form submission
+            colorPicker.element.querySelector('.color-input').setAttribute('data-param-path', param.path);
+            
+            container.appendChild(colorPicker.element);
+            return container;
+        }
+        
+        // Create a position control for the distance
+        function createPositionControl(param, value) {
+            const container = document.createElement('div');
+            container.className = 'position-control-container';
+            
+            // Create the position control component
+            const positionControl = new PositionControl({
+                min: param.schema.minimum || 0.1,
+                max: param.schema.maximum || 3.0,
+                value: value,
+                step: 0.1
+            });
+            
+            // Set data attribute for form submission
+            positionControl.element.querySelector('input').setAttribute('data-param-path', param.path);
+            
+            container.appendChild(positionControl.element);
+            return container;
+        }
+        
+        // Create a number input for numeric values
+        function createNumberInput(param, value) {
+            const container = document.createElement('div');
+            container.className = 'number-input-container';
+            
+            // Create the number input component
+            const numberInput = new NumberInput({
+                minimum: param.schema.minimum,
+                maximum: param.schema.maximum,
+                default: value
+            });
+            
+            // Set data attribute for form submission
+            numberInput.querySelector('input').setAttribute('data-param-path', param.path);
+            
+            container.appendChild(numberInput);
+            return container;
+        }
+        
+        // Show status message
+        function showStatus(message, isSuccess) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status-message ' + (isSuccess ? 'status-success' : 'status-error');
+            status.style.display = 'block';
+            
+            console.log(message); // Log the message to the console
+            
+            // Hide after 5 seconds
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Initialize form when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get schema, key parameters, and initial config
+            Promise.all([
+                fetch('/schema').then(response => response.json()),
+                fetch('/key-parameters').then(response => response.json()),
+                fetch('/config').then(response => response.json())
+            ])
+            .then(([schema, keyParams, config]) => {
+                if (schema.error) {
+                    showStatus(schema.error, false);
+                    return;
+                }
+                if (config.error) {
+                    showStatus(config.error, false);
+                    return;
+                }
+                
+                // Store key parameters
+                keyParameters = keyParams;
+                
+                // Initialize form generator for advanced view
+                formGenerator = new FormGenerator(schema, document.getElementById('form-root'));
+                
+                // Register custom components
+                formGenerator.registerCustomInput('color', (schema) => new ColorPicker(schema));
+                formGenerator.registerCustomInput('number', (schema) => new NumberInput(schema));
+                formGenerator.registerCustomInput('position', (schema) => new PositionControl(schema));
+                
+                // Generate advanced form
+                formGenerator.generateForm();
+                
+                // Parse and set initial data
+                try {
+                    currentConfig = JSON.parse(config.content);
+                    currentSha = config.sha;
+                    
+                    // Set data in advanced form
+                    formGenerator.setFormData(currentConfig);
+                    
+                    // Initialize simple controls
+                    formGenerator.initializeSimpleControls(currentConfig);
+                    
+                    // Create simple form
+                    updateKeyParametersForm();
+                    
+                } catch (error) {
+                    showStatus('Failed to parse configuration: ' + error, false);
+                }
+            })
+            .catch(error => showStatus('Failed to initialize form: ' + error, false));
+        });
+        
+        // Add collapsible sections
+        document.addEventListener('click', (event) => {
+            if (event.target.classList.contains('section-title') || event.target.closest('.section-title')) {
+                const section = event.target.closest('.section');
+                if (section) {
+                    const content = section.querySelector('.section-content');
+                    if (content) {
+                        content.style.display = content.style.display === 'none' ? 'block' : 'none';
+                    }
+                }
+            }
+        });
+        
+        // Handle Ctrl+S for saving
+        document.addEventListener('keydown', (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+                event.preventDefault();
+                saveChanges();
+            }
+        });
+    </script>
+</body>
+</html>
