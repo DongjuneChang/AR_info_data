@@ -48,9 +48,17 @@ class VisualizerApp:
                 self._setup_git_repo()
         
         # Initialize Flask app
+        # Use absolute paths for template and static folders
+        current_dir = Path(__file__).parent
+        template_folder = str(current_dir / 'templates')
+        static_folder = str(current_dir / 'static')
+        
+        print(f"Using template folder: {template_folder}")
+        print(f"Using static folder: {static_folder}")
+        
         self.app = Flask(__name__, 
-                        static_folder=self.config['static_path'],
-                        template_folder=self.config['templates_path'])
+                        static_folder=static_folder,
+                        template_folder=template_folder)
         
         # Register routes
         self._register_routes()
@@ -263,9 +271,37 @@ class VisualizerApp:
             
             data = response.json()
             content = base64.b64decode(data['content']).decode('utf-8')
+            content_json = json.loads(content)
             
+            # 기본값 제공 로직 추가
+            if 'visualization_overrides' in content_json:
+                # referenceLine 기본값 추가
+                if 'referenceLine' not in content_json['visualization_overrides']:
+                    content_json['visualization_overrides']['referenceLine'] = {
+                        'value': 50
+                    }
+                
+                # referenceArea 기본값 추가
+                if 'referenceArea' not in content_json['visualization_overrides']:
+                    content_json['visualization_overrides']['referenceArea'] = {
+                        'min': 45,
+                        'max': 55
+                    }
+                
+                # 색상 키에 referenceLine과 referenceArea 추가
+                if 'colors' in content_json['visualization_overrides']:
+                    if 'referenceLine' not in content_json['visualization_overrides']['colors']:
+                        content_json['visualization_overrides']['colors']['referenceLine'] = {
+                            'r': 1.0, 'g': 0.0, 'b': 0.0, 'a': 1.0
+                        }
+                    if 'referenceArea' not in content_json['visualization_overrides']['colors']:
+                        content_json['visualization_overrides']['colors']['referenceArea'] = {
+                            'r': 1.0, 'g': 0.8, 'b': 0.8, 'a': 0.5
+                        }
+            
+            # 수정된 내용으로 응답 - JSON 문자열로 반환
             return jsonify({
-                'content': content,
+                'content': json.dumps(content_json, indent=2),
                 'sha': data['sha']
             })
         except Exception as e:
@@ -310,6 +346,27 @@ class VisualizerApp:
                         'error': 'Missing required field',
                         'details': f'Field {field} is required'
                     }), 400
+            
+            # Validate optional fields if present
+            print("Validating optional fields")
+            optional_fields = ['referenceLine', 'referenceArea']
+            for field in optional_fields:
+                if field in content_json['visualization_overrides']:
+                    # 각 필드별 유효성 검사
+                    if field == 'referenceLine':
+                        if not isinstance(content_json['visualization_overrides'][field], dict) or 'value' not in content_json['visualization_overrides'][field]:
+                            print(f"Invalid {field} structure")
+                            return jsonify({
+                                'error': f'Invalid {field} structure',
+                                'details': f'{field} must contain value property'
+                            }), 400
+                    elif field == 'referenceArea':
+                        if not isinstance(content_json['visualization_overrides'][field], dict) or 'min' not in content_json['visualization_overrides'][field] or 'max' not in content_json['visualization_overrides'][field]:
+                            print(f"Invalid {field} structure")
+                            return jsonify({
+                                'error': f'Invalid {field} structure',
+                                'details': f'{field} must contain min and max properties'
+                            }), 400
             
             # Validate colors structure
             print("Validating colors structure")
@@ -403,10 +460,13 @@ class VisualizerApp:
                 # Get color keys from GitHub
                 github_color_keys = list(content_json['visualization_overrides']['colors'].keys())
                 
-                # Check if barForeground is missing
-                if 'barForeground' not in github_color_keys:
-                    # Add barForeground to the list
-                    github_color_keys.append('barForeground')
+                # 필수 색상 키 목록
+                required_color_keys = ['barForeground', 'referenceLine', 'referenceArea']
+                
+                # 필수 키가 없으면 추가
+                for key in required_color_keys:
+                    if key not in github_color_keys:
+                        github_color_keys.append(key)
                 
                 return jsonify({
                     'color_keys': github_color_keys

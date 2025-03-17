@@ -23,6 +23,32 @@ h1 {
     padding: 20px;
     background-color: #f9f9f9;
     border-radius: 4px;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#reference-section {
+    /* Match the style of other sections */
+    background-color: #f9f9f9;
+    border-left: none;
+}
+
+.subsection {
+    margin: 15px 0;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    border-left: 3px solid #ddd;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+#reference-line-section, #reference-area-section {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 h2 {
@@ -30,6 +56,13 @@ h2 {
     margin-top: 0;
     margin-bottom: 20px;
     font-size: 1.2em;
+}
+
+h3 {
+    color: #555;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 1.1em;
 }
 
 .field {

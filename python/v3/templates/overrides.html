@@ -28,6 +28,47 @@
             </div>
         </div>
 
+        <div class="section" id="reference-section">
+            <h2>Reference Settings</h2>
+            
+            <div class="subsection" id="reference-line-section">
+                <h3>Reference Line</h3>
+                <div class="field">
+                    <label>Value:</label>
+                    <div class="position-control">
+                        <input type="range" id="reference-line-value" min="0" max="100" step="1" value="50">
+                        <span id="reference-line-value-display">50</span>
+                    </div>
+                    <small>Horizontal line at specified value</small>
+                </div>
+            </div>
+            
+            <div class="subsection" id="reference-area-section">
+                <h3>Reference Area</h3>
+                <div class="field">
+                    <label>Delta Below:</label>
+                    <div class="position-control">
+                        <input type="range" id="reference-area-delta-below" min="0" max="50" step="1" value="5">
+                        <span id="reference-area-delta-below-display">5</span>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Delta Above:</label>
+                    <div class="position-control">
+                        <input type="range" id="reference-area-delta-above" min="0" max="50" step="1" value="5">
+                        <span id="reference-area-delta-above-display">5</span>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Calculated Range:</label>
+                    <div class="calculated-values">
+                        <span id="reference-area-min-display">45</span> - <span id="reference-area-max-display">55</span>
+                    </div>
+                    <small>Shaded area between min and max values</small>
+                </div>
+            </div>
+        </div>
+        
         <div class="section">
             <h2>Centroid Position</h2>
             <div class="field">
@@ -64,37 +105,6 @@
             </div>
         </div>
         
-        <div class="section">
-            <h2>Reference Line</h2>
-            <div class="field">
-                <label>Value:</label>
-                <div class="position-control">
-                    <input type="range" id="reference-line-value" min="0" max="100" step="1" value="50">
-                    <span id="reference-line-value-display">50</span>
-                </div>
-                <small>Horizontal line at specified value</small>
-            </div>
-        </div>
-        
-        <div class="section">
-            <h2>Reference Area</h2>
-            <div class="field">
-                <label>Minimum Value:</label>
-                <div class="position-control">
-                    <input type="range" id="reference-area-min" min="0" max="100" step="1" value="45">
-                    <span id="reference-area-min-display">45</span>
-                </div>
-            </div>
-            <div class="field">
-                <label>Maximum Value:</label>
-                <div class="position-control">
-                    <input type="range" id="reference-area-max" min="0" max="100" step="1" value="55">
-                    <span id="reference-area-max-display">55</span>
-                </div>
-                <small>Shaded area between min and max values</small>
-            </div>
-        </div>
-        
         <div id="status" class="status-message"></div>
     </div>
     
@@ -105,6 +115,57 @@
         let currentSha;
         let currentOverrides;
         let colorPickerInstance;
+        
+        // 페이지 로드 후 추가 디버깅 및 강제 표시
+        window.addEventListener('load', () => {
+            console.log('Window loaded - 추가 디버깅 실행');
+            
+            // HTML 구조 로깅
+            console.log('전체 HTML 구조:');
+            console.log(document.documentElement.outerHTML);
+            
+            // 모든 섹션 확인 및 강제 표시
+            document.querySelectorAll('.section').forEach(section => {
+                console.log('섹션 ID:', section.id, '표시 상태:', window.getComputedStyle(section).display);
+                section.style.display = 'block !important';
+                section.style.visibility = 'visible !important';
+                section.style.opacity = '1 !important';
+                
+                // 섹션 스타일 직접 설정
+                section.setAttribute('style', 'display: block !important; visibility: visible !important; opacity: 1 !important;');
+            });
+            
+            // Reference Line 섹션 특별 처리
+            const refLineSection = document.getElementById('reference-line-section');
+            if (refLineSection) {
+                console.log('Reference Line 섹션 강제 표시');
+                refLineSection.setAttribute('style', 'display: block !important; visibility: visible !important; opacity: 1 !important;');
+                
+                // 부모 요소 확인
+                console.log('Reference Line 섹션 부모:', refLineSection.parentElement);
+                console.log('부모 요소 내 자식 수:', refLineSection.parentElement.children.length);
+            } else {
+                console.log('Reference Line 섹션이 존재하지 않음!');
+            }
+            
+            // Reference Area 섹션 특별 처리
+            const refAreaSection = document.getElementById('reference-area-section');
+            if (refAreaSection) {
+                console.log('Reference Area 섹션 강제 표시');
+                refAreaSection.setAttribute('style', 'display: block !important; visibility: visible !important; opacity: 1 !important;');
+                
+                // 부모 요소 확인
+                console.log('Reference Area 섹션 부모:', refAreaSection.parentElement);
+            } else {
+                console.log('Reference Area 섹션이 존재하지 않음!');
+            }
+            
+            // 모든 섹션 다시 확인
+            console.log('모든 섹션 다시 확인:');
+            document.querySelectorAll('.section').forEach((section, i) => {
+                console.log(`섹션 ${i+1}:`, section.id || '(ID 없음)', section.querySelector('h2')?.textContent);
+            });
+        });
         
         // 기본 색상 키 설정
         const defaultColorKeys = ['frameBackground', 'barBackground', 'barForeground', 'referenceLine', 'referenceArea'];
@@ -137,6 +198,143 @@
         
         // Initialize form when page loads
         document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM Content Loaded');
+            
+            // 모든 섹션 확인
+            const allSections = document.querySelectorAll('.section');
+            console.log('모든 섹션 수:', allSections.length);
+            allSections.forEach((section, index) => {
+                const heading = section.querySelector('h2');
+                console.log(`섹션 ${index + 1} 제목:`, heading ? heading.textContent : '제목 없음');
+                console.log(`섹션 ${index + 1} 표시 상태:`, window.getComputedStyle(section).display);
+                console.log(`섹션 ${index + 1} ID:`, section.id);
+                console.log(`섹션 ${index + 1} 클래스:`, section.className);
+                console.log(`섹션 ${index + 1} 스타일:`, section.style.cssText);
+            });
+            
+            // Reference Line과 Reference Area 섹션 확인
+            const refLineSection = document.getElementById('reference-line-section');
+            const refAreaSection = document.getElementById('reference-area-section');
+            
+            console.log('Reference Line 섹션 존재:', refLineSection ? 'Yes' : 'No');
+            console.log('Reference Area 섹션 존재:', refAreaSection ? 'Yes' : 'No');
+            
+            if (refLineSection) {
+                console.log('Reference Line 섹션 표시 상태:', window.getComputedStyle(refLineSection).display);
+                // 강제로 표시
+                refLineSection.style.display = 'block';
+                refLineSection.style.visibility = 'visible';
+                refLineSection.style.opacity = '1';
+                console.log('Reference Line 섹션 강제 표시 후:', refLineSection.style.cssText);
+            } else {
+                // 섹션이 없으면 동적으로 생성
+                console.log('Reference Line 섹션 동적 생성');
+                createReferenceLineSection();
+            }
+            
+            if (refAreaSection) {
+                console.log('Reference Area 섹션 표시 상태:', window.getComputedStyle(refAreaSection).display);
+                // 강제로 표시
+                refAreaSection.style.display = 'block';
+                refAreaSection.style.visibility = 'visible';
+                refAreaSection.style.opacity = '1';
+                console.log('Reference Area 섹션 강제 표시 후:', refAreaSection.style.cssText);
+            } else {
+                // 섹션이 없으면 동적으로 생성
+                console.log('Reference Area 섹션 동적 생성');
+                createReferenceAreaSection();
+            }
+            
+            // 동적으로 Reference Line 섹션 생성
+            function createReferenceLineSection() {
+                const container = document.querySelector('.form-container');
+                const centroidSection = document.querySelector('.section:nth-child(3)');
+                
+                const refLineSection = document.createElement('div');
+                refLineSection.id = 'reference-line-section';
+                refLineSection.className = 'subsection';
+                refLineSection.style.display = 'block';
+                refLineSection.style.visibility = 'visible';
+                
+                refLineSection.innerHTML = `
+                    <h3>Reference Line</h3>
+                    <div class="field">
+                        <label>Value:</label>
+                        <div class="position-control">
+                            <input type="range" id="reference-line-value" min="0" max="100" step="1" value="50">
+                            <span id="reference-line-value-display">50</span>
+                        </div>
+                        <small>Horizontal line at specified value</small>
+                    </div>
+                `;
+                
+                container.insertBefore(refLineSection, centroidSection.nextSibling);
+                
+                // 이벤트 리스너 추가
+                document.getElementById('reference-line-value').addEventListener('input', function() {
+                    document.getElementById('reference-line-value-display').textContent = this.value;
+                });
+                
+                console.log('Reference Line 섹션 생성 완료');
+            }
+            
+            // 동적으로 Reference Area 섹션 생성
+            function createReferenceAreaSection() {
+                const container = document.querySelector('.form-container');
+                const refLineSection = document.getElementById('reference-line-section') || 
+                                      document.querySelector('.section:nth-child(3)').nextSibling;
+                
+                const refAreaSection = document.createElement('div');
+                refAreaSection.id = 'reference-area-section';
+                refAreaSection.className = 'subsection';
+                refAreaSection.style.display = 'block';
+                refAreaSection.style.visibility = 'visible';
+                
+                refAreaSection.innerHTML = `
+                    <h3>Reference Area</h3>
+                    <div class="field">
+                        <label>Minimum Value:</label>
+                        <div class="position-control">
+                            <input type="range" id="reference-area-min" min="0" max="100" step="1" value="45">
+                            <span id="reference-area-min-display">45</span>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Maximum Value:</label>
+                        <div class="position-control">
+                            <input type="range" id="reference-area-max" min="0" max="100" step="1" value="55">
+                            <span id="reference-area-max-display">55</span>
+                        </div>
+                        <small>Shaded area between min and max values</small>
+                    </div>
+                `;
+                
+                container.insertBefore(refAreaSection, refLineSection.nextSibling);
+                
+                // 이벤트 리스너 추가
+                document.getElementById('reference-area-min').addEventListener('input', function() {
+                    document.getElementById('reference-area-min-display').textContent = this.value;
+                    // Ensure min doesn't exceed max
+                    const maxSlider = document.getElementById('reference-area-max');
+                    if (parseInt(this.value) > parseInt(maxSlider.value)) {
+                        maxSlider.value = this.value;
+                        document.getElementById('reference-area-max-display').textContent = this.value;
+                    }
+                });
+                
+                document.getElementById('reference-area-max').addEventListener('input', function() {
+                    document.getElementById('reference-area-max-display').textContent = this.value;
+                    // Ensure max doesn't go below min
+                    const minSlider = document.getElementById('reference-area-min');
+                    if (parseInt(this.value) < parseInt(minSlider.value)) {
+                        minSlider.value = this.value;
+                        document.getElementById('reference-area-min-display').textContent = this.value;
+                    }
+                });
+                
+                console.log('Reference Area 섹션 생성 완료');
+            }
+            
             loadFromGitHub();
             
             // Add event listener for color target selector
@@ -179,6 +377,28 @@
         function loadFromGitHub() {
             showStatus('Loading data from GitHub...', true);
             
+            // 먼저 모든 섹션이 표시되도록 강제 설정
+            document.querySelectorAll('.section').forEach(section => {
+                section.style.display = 'block';
+                section.style.visibility = 'visible';
+                section.style.opacity = '1';
+                
+                // 섹션 스타일 직접 설정
+                section.setAttribute('style', 'display: block !important; visibility: visible !important; opacity: 1 !important;');
+            });
+            
+            // Reference Line 섹션 특별 처리
+            const refLineSection = document.getElementById('reference-line-section');
+            if (refLineSection) {
+                refLineSection.setAttribute('style', 'display: block !important; visibility: visible !important; opacity: 1 !important;');
+            }
+            
+            // Reference Area 섹션 특별 처리
+            const refAreaSection = document.getElementById('reference-area-section');
+            if (refAreaSection) {
+                refAreaSection.setAttribute('style', 'display: block !important; visibility: visible !important; opacity: 1 !important;');
+            }
+            
             // Fetch both overrides and color keys
             Promise.all([
                 fetch('/overrides').then(response => response.json()),
@@ -191,17 +411,61 @@
                     showStatus('Using default overrides: ' + overridesData.error, false);
                     currentOverrides = defaultOverrides;
                 } else {
+                    console.log('Raw overrides data:', overridesData);
+                    console.log('Raw content type:', typeof overridesData.content);
+                    // Parse the JSON string
                     currentOverrides = JSON.parse(overridesData.content);
+                    console.log('Parsed overrides:', currentOverrides);
                     currentSha = overridesData.sha;
                 }
                 
-                // Handle color keys data
-                if (colorKeysData.error) {
-                    console.error('Color keys error:', colorKeysData.error);
-                    showStatus('Using default color keys: ' + colorKeysData.error, false);
-                    populateColorSelector(defaultColorKeys);
-                } else {
-                    populateColorSelector(colorKeysData.color_keys);
+                // 먼저 Reference Line 및 Reference Area 초기화
+                // Initialize reference line slider
+                console.log('Checking referenceLine:', currentOverrides.visualization_overrides.referenceLine);
+                if (currentOverrides.visualization_overrides.referenceLine) {
+                    const refLine = currentOverrides.visualization_overrides.referenceLine;
+                    const refLineInput = document.getElementById('reference-line-value');
+                    const refLineDisplay = document.getElementById('reference-line-value-display');
+                    
+                    if (refLineInput && refLineDisplay) {
+                        refLineInput.value = refLine.value;
+                        refLineDisplay.textContent = refLine.value;
+                        console.log('Reference Line 값 설정 완료:', refLine.value);
+                    } else {
+                        console.error('Reference Line 요소를 찾을 수 없음');
+                    }
+                }
+                
+                // Initialize reference area delta sliders
+                console.log('Checking referenceArea:', currentOverrides.visualization_overrides.referenceArea);
+                if (currentOverrides.visualization_overrides.referenceArea) {
+                    const refArea = currentOverrides.visualization_overrides.referenceArea;
+                    const refLine = currentOverrides.visualization_overrides.referenceLine;
+                    const lineValue = refLine ? refLine.value : 50;
+                    
+                    // Calculate delta values based on min/max values
+                    // Use absolute differences to ensure delta values are always positive
+                    const deltaBelow = Math.abs(lineValue - refArea.min);
+                    const deltaAbove = Math.abs(refArea.max - lineValue);
+                    
+                    const deltaBelowInput = document.getElementById('reference-area-delta-below');
+                    const deltaAboveInput = document.getElementById('reference-area-delta-above');
+                    const deltaBelowDisplay = document.getElementById('reference-area-delta-below-display');
+                    const deltaAboveDisplay = document.getElementById('reference-area-delta-above-display');
+                    const minDisplay = document.getElementById('reference-area-min-display');
+                    const maxDisplay = document.getElementById('reference-area-max-display');
+                    
+                    if (deltaBelowInput && deltaAboveInput && deltaBelowDisplay && deltaAboveDisplay && minDisplay && maxDisplay) {
+                        deltaBelowInput.value = deltaBelow;
+                        deltaAboveInput.value = deltaAbove;
+                        deltaBelowDisplay.textContent = deltaBelow;
+                        deltaAboveDisplay.textContent = deltaAbove;
+                        minDisplay.textContent = refArea.min;
+                        maxDisplay.textContent = refArea.max;
+                        console.log('Reference Area 델타 값 설정 완료:', deltaBelow, deltaAbove);
+                    } else {
+                        console.error('Reference Area 요소를 찾을 수 없음');
+                    }
                 }
                 
                 // Initialize position sliders
@@ -213,23 +477,24 @@
                 document.getElementById('position-y-value').textContent = position.y.toFixed(2);
                 document.getElementById('position-z-value').textContent = position.z.toFixed(2);
                 
-                // Initialize reference line slider
-                if (currentOverrides.visualization_overrides.referenceLine) {
-                    const refLine = currentOverrides.visualization_overrides.referenceLine;
-                    document.getElementById('reference-line-value').value = refLine.value;
-                    document.getElementById('reference-line-value-display').textContent = refLine.value;
-                }
-                
-                // Initialize reference area sliders
-                if (currentOverrides.visualization_overrides.referenceArea) {
-                    const refArea = currentOverrides.visualization_overrides.referenceArea;
-                    document.getElementById('reference-area-min').value = refArea.min;
-                    document.getElementById('reference-area-max').value = refArea.max;
-                    document.getElementById('reference-area-min-display').textContent = refArea.min;
-                    document.getElementById('reference-area-max-display').textContent = refArea.max;
+                // 마지막으로 색상 선택기 초기화
+                // Handle color keys data
+                if (colorKeysData.error) {
+                    console.error('Color keys error:', colorKeysData.error);
+                    showStatus('Using default color keys: ' + colorKeysData.error, false);
+                    populateColorSelector(defaultColorKeys);
+                } else {
+                    populateColorSelector(colorKeysData.color_keys);
                 }
                 
                 showStatus('Data loaded successfully', true);
+                
+                // 모든 섹션 다시 확인
+                console.log('데이터 로드 후 모든 섹션 확인:');
+                document.querySelectorAll('.section').forEach((section, i) => {
+                    console.log(`섹션 ${i+1}:`, section.id || '(ID 없음)', section.querySelector('h2')?.textContent);
+                    console.log(`섹션 ${i+1} 표시 상태:`, window.getComputedStyle(section).display);
+                });
             })
             .catch(error => {
                 console.error('Failed to load data:', error);
@@ -303,9 +568,11 @@
             // Get reference line value
             const referenceLineValue = parseInt(document.getElementById('reference-line-value').value);
             
-            // Get reference area min/max
-            const referenceAreaMin = parseInt(document.getElementById('reference-area-min').value);
-            const referenceAreaMax = parseInt(document.getElementById('reference-area-max').value);
+            // Calculate reference area min/max based on deltas
+            const deltaBelow = parseInt(document.getElementById('reference-area-delta-below').value);
+            const deltaAbove = parseInt(document.getElementById('reference-area-delta-above').value);
+            const referenceAreaMin = Math.max(0, referenceLineValue - deltaBelow);
+            const referenceAreaMax = Math.min(100, referenceLineValue + deltaAbove);
             
             // Create the overrides object with the correct structure
             const overridesData = {
@@ -386,29 +653,41 @@
         
         // Reference line slider event listener
         document.getElementById('reference-line-value').addEventListener('input', function() {
-            document.getElementById('reference-line-value-display').textContent = this.value;
+            const lineValue = parseInt(this.value);
+            document.getElementById('reference-line-value-display').textContent = lineValue;
+            
+            // Update reference area min/max based on deltas
+            updateReferenceAreaMinMax(lineValue);
         });
         
-        // Reference area slider event listeners
-        document.getElementById('reference-area-min').addEventListener('input', function() {
-            document.getElementById('reference-area-min-display').textContent = this.value;
-            // Ensure min doesn't exceed max
-            const maxSlider = document.getElementById('reference-area-max');
-            if (parseInt(this.value) > parseInt(maxSlider.value)) {
-                maxSlider.value = this.value;
-                document.getElementById('reference-area-max-display').textContent = this.value;
-            }
+        // Reference area delta slider event listeners
+        document.getElementById('reference-area-delta-below').addEventListener('input', function() {
+            document.getElementById('reference-area-delta-below-display').textContent = this.value;
+            
+            // Update reference area min/max based on current line value and deltas
+            const lineValue = parseInt(document.getElementById('reference-line-value').value);
+            updateReferenceAreaMinMax(lineValue);
         });
         
-        document.getElementById('reference-area-max').addEventListener('input', function() {
-            document.getElementById('reference-area-max-display').textContent = this.value;
-            // Ensure max doesn't go below min
-            const minSlider = document.getElementById('reference-area-min');
-            if (parseInt(this.value) < parseInt(minSlider.value)) {
-                minSlider.value = this.value;
-                document.getElementById('reference-area-min-display').textContent = this.value;
-            }
+        document.getElementById('reference-area-delta-above').addEventListener('input', function() {
+            document.getElementById('reference-area-delta-above-display').textContent = this.value;
+            
+            // Update reference area min/max based on current line value and deltas
+            const lineValue = parseInt(document.getElementById('reference-line-value').value);
+            updateReferenceAreaMinMax(lineValue);
         });
+        
+        // Function to update reference area min/max based on line value and deltas
+        function updateReferenceAreaMinMax(lineValue) {
+            const deltaBelow = parseInt(document.getElementById('reference-area-delta-below').value);
+            const deltaAbove = parseInt(document.getElementById('reference-area-delta-above').value);
+            
+            const minValue = Math.max(0, lineValue - deltaBelow);
+            const maxValue = Math.min(100, lineValue + deltaAbove);
+            
+            document.getElementById('reference-area-min-display').textContent = minValue;
+            document.getElementById('reference-area-max-display').textContent = maxValue;
+        }
         
         function showStatus(message, isSuccess) {
             const status = document.getElementById('status');

@@ -105,4 +105,28 @@ These configuration files are used by the ASU Tele-Rehab AR application to custo
 
 ## For Lab Members
 
-To get access to the Deploy Key for editing configurations, please contact the lab administrator. The Deploy Key allows you to update the configuration files through the web interface without needing to create a personal GitHub token.
+To get access to the Deploy Key (ar_info_data_key) for editing configurations, please contact dongjune.chang@gmail.com. The Deploy Key allows you to update the configuration files through the web interface without needing to create a personal GitHub token.
+
+### Setting Up the Deploy Key
+
+1. **Request the ar_info_data_key file** from dongjune.chang@gmail.com
+2. **Unzip the file** to a secure location on your computer
+3. **Update the .env file** in the `python/v3` directory:
+   ```
+   USE_DEPLOY_KEY=true
+   DEPLOY_KEY_PATH=path/to/your/unzipped/ar_info_data_key
+   GITHUB_REPO=AR_info_data
+   GITHUB_OWNER=DongjuneChang
+   OVERRIDES_PATH=visualization/visualization_overrides.json
+   ```
+   Make sure to use the correct path to the unzipped ar_info_data_key file.
+
+## Unity Integration with Deploy Key
+
+The Unity application currently uses a hardcoded GitHub token in `Utilities3.cs`. To update the Unity application to use the deploy key instead:
+
+1. **Request the ar_info_data_key file** from dongjune.chang@gmail.com if you haven't already
+2. **Unzip the file** to a secure location on your computer
+3. **Update the GitHubUtility2.cs file** to use the deploy key instead of the token
+   - This requires modifying the authentication method to use SSH with the deploy key
+   - Alternatively, you can update the TOKEN constant in Utilities3.cs with a valid token that has access to the AR_info_data repository

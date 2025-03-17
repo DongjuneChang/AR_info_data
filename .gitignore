@@ -36,3 +36,9 @@ Thumbs.db
 
 # Environment variables
 .env
+
+# SSH Keys
+ar_info_data_key
+ar_info_data_key.meta
+ar_info_data_key.pub
+ar_info_data_key.pub.meta
