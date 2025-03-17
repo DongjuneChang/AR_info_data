@@ -32,17 +32,17 @@
         "a": 0.5
       }
     },
-    "referenceLine": {
-      "value": 50
-    },
-    "referenceArea": {
-      "min": 45,
-      "max": 55
-    },
     "centroidPosition": {
       "x": 0,
-      "y": 1.0,
+      "y": 1,
       "z": -0.2
+    },
+    "referenceLine": {
+      "value": 78
+    },
+    "referenceArea": {
+      "min": 68,
+      "max": 88
     },
     "enabled": true
   }
