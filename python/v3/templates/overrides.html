@@ -64,6 +64,37 @@
             </div>
         </div>
         
+        <div class="section">
+            <h2>Reference Line</h2>
+            <div class="field">
+                <label>Value:</label>
+                <div class="position-control">
+                    <input type="range" id="reference-line-value" min="0" max="100" step="1" value="50">
+                    <span id="reference-line-value-display">50</span>
+                </div>
+                <small>Horizontal line at specified value</small>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Reference Area</h2>
+            <div class="field">
+                <label>Minimum Value:</label>
+                <div class="position-control">
+                    <input type="range" id="reference-area-min" min="0" max="100" step="1" value="45">
+                    <span id="reference-area-min-display">45</span>
+                </div>
+            </div>
+            <div class="field">
+                <label>Maximum Value:</label>
+                <div class="position-control">
+                    <input type="range" id="reference-area-max" min="0" max="100" step="1" value="55">
+                    <span id="reference-area-max-display">55</span>
+                </div>
+                <small>Shaded area between min and max values</small>
+            </div>
+        </div>
+        
         <div id="status" class="status-message"></div>
     </div>
     
@@ -76,7 +107,7 @@
         let colorPickerInstance;
         
         // 기본 색상 키 설정
-        const defaultColorKeys = ['frameBackground', 'barBackground', 'barForeground'];
+        const defaultColorKeys = ['frameBackground', 'barBackground', 'barForeground', 'referenceLine', 'referenceArea'];
         
         // 기본 오버라이드 설정
         const defaultOverrides = {
@@ -84,7 +115,16 @@
                 colors: {
                     frameBackground: { r: 0.2, g: 0.2, b: 0.2, a: 1.0 },
                     barBackground: { r: 0.8, g: 0.8, b: 0.8, a: 1.0 },
-                    barForeground: { r: 0.0, g: 0.7, b: 1.0, a: 1.0 }
+                    barForeground: { r: 0.0, g: 0.7, b: 1.0, a: 1.0 },
+                    referenceLine: { r: 1.0, g: 0.0, b: 0.0, a: 1.0 },
+                    referenceArea: { r: 1.0, g: 0.8, b: 0.8, a: 0.5 }
+                },
+                referenceLine: {
+                    value: 50
+                },
+                referenceArea: {
+                    min: 45,
+                    max: 55
                 },
                 centroidPosition: {
                     x: 0.0,
@@ -173,6 +213,22 @@
                 document.getElementById('position-y-value').textContent = position.y.toFixed(2);
                 document.getElementById('position-z-value').textContent = position.z.toFixed(2);
                 
+                // Initialize reference line slider
+                if (currentOverrides.visualization_overrides.referenceLine) {
+                    const refLine = currentOverrides.visualization_overrides.referenceLine;
+                    document.getElementById('reference-line-value').value = refLine.value;
+                    document.getElementById('reference-line-value-display').textContent = refLine.value;
+                }
+                
+                // Initialize reference area sliders
+                if (currentOverrides.visualization_overrides.referenceArea) {
+                    const refArea = currentOverrides.visualization_overrides.referenceArea;
+                    document.getElementById('reference-area-min').value = refArea.min;
+                    document.getElementById('reference-area-max').value = refArea.max;
+                    document.getElementById('reference-area-min-display').textContent = refArea.min;
+                    document.getElementById('reference-area-max-display').textContent = refArea.max;
+                }
+                
                 showStatus('Data loaded successfully', true);
             })
             .catch(error => {
@@ -191,6 +247,18 @@
                 document.getElementById('position-x-value').textContent = position.x.toFixed(2);
                 document.getElementById('position-y-value').textContent = position.y.toFixed(2);
                 document.getElementById('position-z-value').textContent = position.z.toFixed(2);
+                
+                // Initialize reference line slider with default values
+                const refLine = defaultOverrides.visualization_overrides.referenceLine;
+                document.getElementById('reference-line-value').value = refLine.value;
+                document.getElementById('reference-line-value-display').textContent = refLine.value;
+                
+                // Initialize reference area sliders with default values
+                const refArea = defaultOverrides.visualization_overrides.referenceArea;
+                document.getElementById('reference-area-min').value = refArea.min;
+                document.getElementById('reference-area-max').value = refArea.max;
+                document.getElementById('reference-area-min-display').textContent = refArea.min;
+                document.getElementById('reference-area-max-display').textContent = refArea.max;
             });
         }
         
@@ -232,6 +300,13 @@
             const positionY = parseFloat(document.getElementById('position-y').value);
             const positionZ = parseFloat(document.getElementById('position-z').value);
             
+            // Get reference line value
+            const referenceLineValue = parseInt(document.getElementById('reference-line-value').value);
+            
+            // Get reference area min/max
+            const referenceAreaMin = parseInt(document.getElementById('reference-area-min').value);
+            const referenceAreaMax = parseInt(document.getElementById('reference-area-max').value);
+            
             // Create the overrides object with the correct structure
             const overridesData = {
                 visualization_overrides: {
@@ -241,13 +316,22 @@
                         y: positionY,
                         z: positionZ
                     },
+                    referenceLine: {
+                        value: referenceLineValue
+                    },
+                    referenceArea: {
+                        min: referenceAreaMin,
+                        max: referenceAreaMax
+                    },
                     enabled: true
                 }
             };
             
-            // Copy existing colors if available
-            if (currentOverrides && currentOverrides.visualization_overrides && currentOverrides.visualization_overrides.colors) {
-                Object.assign(overridesData.visualization_overrides.colors, currentOverrides.visualization_overrides.colors);
+            // Copy existing colors from current overrides
+            if (currentOverrides && currentOverrides.visualization_overrides && 
+                currentOverrides.visualization_overrides.colors) {
+                Object.assign(overridesData.visualization_overrides.colors, 
+                             currentOverrides.visualization_overrides.colors);
             }
             
             // Update the selected color
@@ -298,6 +382,32 @@
         });
         document.getElementById('position-z').addEventListener('input', function() {
             document.getElementById('position-z-value').textContent = parseFloat(this.value).toFixed(2);
+        });
+        
+        // Reference line slider event listener
+        document.getElementById('reference-line-value').addEventListener('input', function() {
+            document.getElementById('reference-line-value-display').textContent = this.value;
+        });
+        
+        // Reference area slider event listeners
+        document.getElementById('reference-area-min').addEventListener('input', function() {
+            document.getElementById('reference-area-min-display').textContent = this.value;
+            // Ensure min doesn't exceed max
+            const maxSlider = document.getElementById('reference-area-max');
+            if (parseInt(this.value) > parseInt(maxSlider.value)) {
+                maxSlider.value = this.value;
+                document.getElementById('reference-area-max-display').textContent = this.value;
+            }
+        });
+        
+        document.getElementById('reference-area-max').addEventListener('input', function() {
+            document.getElementById('reference-area-max-display').textContent = this.value;
+            // Ensure max doesn't go below min
+            const minSlider = document.getElementById('reference-area-min');
+            if (parseInt(this.value) < parseInt(minSlider.value)) {
+                minSlider.value = this.value;
+                document.getElementById('reference-area-min-display').textContent = this.value;
+            }
         });
         
         function showStatus(message, isSuccess) {

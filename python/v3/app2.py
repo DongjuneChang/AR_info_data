@@ -171,30 +171,45 @@ class VisualizerApp:
             file_path = os.path.join(self.temp_dir, self.overrides_path)
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             
+            print(f"Writing content to {file_path}")
             with open(file_path, 'w') as f:
-                f.write(base64.b64decode(data['content']).decode())
+                content = base64.b64decode(data['content']).decode()
+                f.write(content)
+                print(f"Content written: {content[:100]}...")
             
             # Commit and push changes
-            subprocess.run(
+            print("Running git add...")
+            add_result = subprocess.run(
                 ["git", "add", self.overrides_path],
                 cwd=self.temp_dir,
                 check=True,
                 capture_output=True
             )
+            print(f"Git add output: {add_result.stdout.decode()}")
             
-            subprocess.run(
-                ["git", "commit", "-m", data.get('message', 'Update visualization overrides')],
+            print("Running git commit...")
+            commit_message = data.get('message', 'Update visualization overrides')
+            commit_result = subprocess.run(
+                ["git", "commit", "-m", commit_message],
                 cwd=self.temp_dir,
                 check=True,
                 capture_output=True
             )
+            print(f"Git commit output: {commit_result.stdout.decode()}")
             
-            subprocess.run(
+            print("Running git push...")
+            push_result = subprocess.run(
                 ["git", "push", "origin", "master"],
                 cwd=self.temp_dir,
-                check=True,
+                check=False,  # Don't raise exception on error
                 capture_output=True
             )
+            
+            if push_result.returncode != 0:
+                print(f"Git push error: {push_result.stderr.decode()}")
+                raise Exception(f"Git push failed: {push_result.stderr.decode()}")
+            else:
+                print(f"Git push output: {push_result.stdout.decode()}")
             
             # Create response-like object
             class GitResponse:
@@ -262,84 +277,107 @@ class VisualizerApp:
     def update_overrides(self):
         """Update visualization overrides on GitHub"""
         try:
+            print("Received update request")
             data = request.json
+            print(f"Request data: {data}")
             
             if not data.get('content') or not data.get('sha'):
+                print("Missing required fields")
                 return jsonify({
                     'error': 'Missing required fields',
                     'details': 'Both content and sha fields are required'
                 }), 400
             
             # Parse and validate the content
+            print("Parsing content")
             content_json = json.loads(data['content'])
+            print(f"Parsed content: {json.dumps(content_json, indent=2)[:200]}...")
+            
             if not isinstance(content_json, dict) or 'visualization_overrides' not in content_json:
+                print("Invalid content structure")
                 return jsonify({
                     'error': 'Invalid content structure',
                     'details': 'Content must contain visualization_overrides object'
                 }), 400
             
             # Validate required fields
+            print("Validating required fields")
             required_fields = ['colors', 'centroidPosition', 'enabled']
             for field in required_fields:
                 if field not in content_json['visualization_overrides']:
+                    print(f"Missing required field: {field}")
                     return jsonify({
                         'error': 'Missing required field',
                         'details': f'Field {field} is required'
                     }), 400
             
             # Validate colors structure
+            print("Validating colors structure")
             colors = content_json['visualization_overrides']['colors']
             if not isinstance(colors, dict):
+                print("Invalid colors structure")
                 return jsonify({
                     'error': 'Invalid colors structure',
                     'details': 'colors must be an object'
                 }), 400
             
             # Validate color components
+            print("Validating color components")
             for color_key, color_value in colors.items():
                 if color_value is not None:
                     for component in ['r', 'g', 'b', 'a']:
                         if component not in color_value or not isinstance(color_value[component], (int, float)):
+                            print(f"Invalid {color_key} structure: missing {component}")
                             return jsonify({
                                 'error': f'Invalid {color_key} structure',
                                 'details': f'{color_key} must contain numeric {component} value'
                             }), 400
             
             # Validate centroidPosition structure
+            print("Validating centroidPosition structure")
             pos = content_json['visualization_overrides']['centroidPosition']
             for coord in ['x', 'y', 'z']:
                 if coord not in pos or not isinstance(pos[coord], (int, float)):
+                    print(f"Invalid centroidPosition structure: missing {coord}")
                     return jsonify({
                         'error': 'Invalid centroidPosition structure',
                         'details': f'centroidPosition must contain numeric {coord} value'
                     }), 400
             
             # Prepare and send update request
+            print("Preparing update request")
             payload = {
                 "message": "Update visualization overrides",
                 "content": base64.b64encode(data['content'].encode()).decode(),
                 "sha": data['sha']
             }
             
+            print("Sending update request")
             response = self._github_request('PUT', payload)
             
             if response.status_code not in [200, 201]:
+                print(f"Error response: {response.status_code} - {response.text}")
                 return jsonify({
                     'success': False,
                     'error': f"GitHub API returned status code {response.status_code}",
                     'details': response.text
                 })
             
+            print("Update successful")
             return jsonify({
                 "success": True,
                 "message": "Successfully updated visualization overrides"
             })
         except json.JSONDecodeError as e:
+            print(f"JSON decode error: {e}")
             return jsonify({
                 'error': 'Invalid JSON content',
                 'details': str(e)
             }), 400
         except Exception as e:
+            print(f"Exception: {e}")
+            import traceback
+            traceback.print_exc()
             return jsonify({
                 'error': 'Internal server error',
                 'details': str(e)
