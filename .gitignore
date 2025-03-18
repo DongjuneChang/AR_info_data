@@ -37,6 +37,9 @@ Thumbs.db
 # Environment variables
 .env
 
+# Unity meta files
+*.meta
+
 # SSH Keys
 ar_info_data_key
 ar_info_data_key.meta
