@@ -77,12 +77,12 @@
     "referenceLineSettings": {
       "useReferenceLine": true,
       "referenceLineThickness": 0.005,
-      "referenceLineValue": 50
+      "referenceLineValue": 90
     },
     "referenceAreaSettings": {
       "useReferenceArea": true,
-      "referenceAreaMin": 45,
-      "referenceAreaMax": 55,
+      "referenceAreaMin": 80,
+      "referenceAreaMax": 100,
       "referenceAreaZOffset": 0.005
     }
   },
