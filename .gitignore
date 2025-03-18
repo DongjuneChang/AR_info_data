@@ -40,6 +40,9 @@ Thumbs.db
 # Unity meta files
 *.meta
 
+# Documentation
+git_commands.md
+
 # SSH Keys
 ar_info_data_key
 ar_info_data_key.meta
