@@ -2,7 +2,7 @@
   "visualization_overrides": {
     "colors": {
       "frameBackground": {
-        "r": 0.5137254901960784,
+        "r": 1,
         "g": 1,
         "b": 1,
         "a": 1
@@ -38,11 +38,11 @@
       "z": -0.2
     },
     "referenceLine": {
-      "value": 90
+      "value": 60
     },
     "referenceArea": {
-      "min": 80,
-      "max": 100
+      "min": 50,
+      "max": 70
     },
     "enabled": true
   }
