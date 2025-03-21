@@ -38,11 +38,11 @@
       "z": -0.2
     },
     "referenceLine": {
-      "value": 80
+      "value": 90
     },
     "referenceArea": {
-      "min": 70,
-      "max": 90
+      "min": 80,
+      "max": 100
     },
     "enabled": true
   }
