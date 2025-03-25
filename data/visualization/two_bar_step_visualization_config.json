@@ -68,7 +68,7 @@
       "orientToCamera": true,
       "solverOffset": {
         "x": 0,
-        "y": -0.3,
+        "y": -0.4,
         "z": 1.6
       },
       "solverType": "RadialView",
