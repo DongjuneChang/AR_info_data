@@ -69,7 +69,7 @@
       "solverOffset": {
         "x": 0,
         "y": -0.4,
-        "z": 1.6
+        "z": 1.0
       },
       "solverType": "Orbital",
       "useSolver": true
