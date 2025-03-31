@@ -75,12 +75,12 @@
       "useSolver": true
     },
     "referenceLineSettings": {
-      "useReferenceLine": true,
+      "useReferenceLine": false,
       "referenceLineThickness": 0.005,
       "referenceLineValue": 90
     },
     "referenceAreaSettings": {
-      "useReferenceArea": true,
+      "useReferenceArea": false,
       "referenceAreaMin": 80,
       "referenceAreaMax": 100,
       "referenceAreaZOffset": 0.005
