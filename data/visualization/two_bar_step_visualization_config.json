@@ -76,7 +76,7 @@
     },
     "referenceLineSettings": {
       "useReferenceLine": true,
-      "referenceLineThickness": 0.00,
+      "referenceLineThickness": 0.005,
       "referenceLineValue": 90
     },
     "referenceAreaSettings": {
